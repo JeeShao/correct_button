@@ -16,7 +16,7 @@
 using namespace std;
 using namespace  cv;
 
-Mat pertImage0(IplImage* srcImage);
+Mat pertImage0(Mat srcImage);
 vector<string> exchange(string str, char* c);
 IplImage* getRectImage(IplImage *srcImage, int x, int y, int width, int height);
 double temp_match(cv::Mat image, cv::Mat tepl, cv::Point &point, int method);

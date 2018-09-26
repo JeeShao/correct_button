@@ -2,6 +2,7 @@
 #include <cstring>
 #include <sys/ioctl.h>
 #include <sys/file.h>
+#include <fcntl.h>
 #include "serial.h"
 
 // 初始化串口设备并进行原有设置的保存
@@ -16,15 +17,17 @@ TTY_INFO *readyTTY(int id)
     sprintf(ptty->name,"/dev/ttyS%d",id);
 
     // 打开并且设置串口
-    ptty->fd = open(ptty->name, O_RDWR | O_NOCTTY |O_NDELAY);
+    ptty->fd = open(ptty->name, O_RDWR | O_NOCTTY |O_NDELAY); //读写 非控制终端 非阻塞
+    fcntl(ptty->fd,F_SETFL,FNDELAY);
     if (ptty->fd <0)
     {
+        cout<<"串口打开失败！"<<endl;
         free(ptty);
         return NULL;
     }
 
     // 取得并且保存原来的设置
-    tcgetattr(ptty->fd,&ptty->otm);
+    tcgetattr(ptty->fd,&ptty->otm);//  fd => otm
     return ptty;
 }
 
@@ -51,10 +54,9 @@ int cleanTTY(TTY_INFO *ptty)
 // return 返回值类型(int),函数执行成功返回零值，否则返回大于零的值
 int setTTYSpeed(TTY_INFO *ptty, int speed)
 {
-    int i;
     // 进行新的串口设置,数据位为8位
-    bzero(&ptty->ntm, sizeof(ptty->ntm));
-    tcgetattr(ptty->fd,&ptty->ntm);
+    bzero(&ptty->ntm, sizeof(ptty->ntm));  //ntm置0
+    tcgetattr(ptty->fd,&ptty->ntm);//fd=>ntm
     ptty->ntm.c_cflag = /*CS8 |*/ CLOCAL | CREAD;
     switch(speed)
     {
@@ -83,12 +85,11 @@ int setTTYSpeed(TTY_INFO *ptty, int speed)
             ptty->ntm.c_cflag |= B115200;
             break;
     }
-    ptty->ntm.c_iflag = IGNPAR;
+    ptty->ntm.c_iflag = IGNPAR;  //忽略奇偶校验error
     ptty->ntm.c_oflag = 0;
 
-    tcflush(ptty->fd, TCIFLUSH);
+    tcflush(ptty->fd, TCIFLUSH); //处理未接收字符
     tcsetattr(ptty->fd,TCSANOW,&ptty->ntm);
-
     return 0;
 }
 
@@ -180,16 +181,22 @@ int setTTYParity(TTY_INFO *ptty,int databits,int parity,int stopbits)
     return 0;
 }
 
-int recvnTTY(TTY_INFO *ptty,char *pbuf,int size)
+int recvnTTY(TTY_INFO *ptty,unsigned char *pbuf,int size)
 {
     int ret,left,bytes;
     left = size;
+
+    pthread_mutex_lock(&ptty->mt);
+    ret = read(ptty->fd,pbuf,left);
+    pthread_mutex_unlock(&ptty->mt);
+    return ret;
+
     while(left>0)
     {
         ret = 0;
         bytes = 0;
         pthread_mutex_lock(&ptty->mt);
-        ioctl(ptty->fd, FIONREAD, &bytes);
+        ioctl(ptty->fd, FIONREAD, &bytes); //检测串口数据
         if(bytes>0)
         {
             ret = read(ptty->fd,pbuf,left);
@@ -205,13 +212,17 @@ int recvnTTY(TTY_INFO *ptty,char *pbuf,int size)
     return size - left;
 }
 
-int sendnTTY(TTY_INFO *ptty,char *pbuf,int size)
+int sendnTTY(TTY_INFO *ptty,unsigned char *pbuf,int size)
 {
     int ret,nleft;
-    char *ptmp;
-    ret = 0;
+    unsigned char *ptmp;
     nleft = size;
     ptmp = pbuf;
+
+    pthread_mutex_lock(&ptty->mt);
+    ret = write(ptty->fd,ptmp,nleft);
+    pthread_mutex_unlock(&ptty->mt);
+    return ret;
 
     while(nleft>0)
     {
@@ -248,46 +259,39 @@ int unlockTTY(TTY_INFO *ptty)
 
 
 // 接口测试
-
-int main(int argc,char **argv)
-{
-    TTY_INFO *ptty;
-    int nbyte,idx;
-//    unsigned char cc[16];
-    char cc[16];
-
-    ptty = readyTTY(0);
-    if(ptty == NULL)
-    {
-        printf("readyTTY(0) error\n");
-        return 1;
-    }
-    //
-
-    //
-
-    lockTTY(ptty);
-    if(setTTYSpeed(ptty,9600)>0)
-    {
-        printf("setTTYSpeed() error\n");
-        return -1;
-    }
-    if(setTTYParity(ptty,8,'N',1)>0)
-    {
-        printf("setTTYParity() error\n");
-        return -1;
-    }
-    //
-
-    idx = 0;
-    while(1)
-    {
-        cc[0] = 0xFA;
-        sendnTTY(ptty,&cc[0],1);
-        nbyte = recvnTTY(ptty,cc,1);
-        printf("%d:%02X\n",idx++,cc[0]);
-    }
-
-    cleanTTY(ptty);
-
-}
+//int main(int argc,char **argv)
+//{
+//    TTY_INFO *ptty;
+//    int nbyte,idx;
+////    unsigned char cc[16];
+//    char cc[16];
+//
+//    ptty = readyTTY(0);
+//    if(ptty == NULL)
+//    {
+//        printf("readyTTY(0) error\n");
+//        return 1;
+//    }
+//
+//
+//    lockTTY(ptty);
+//    if(setTTYSpeed(ptty,115200)>0)
+//    {
+//        printf("setTTYSpeed() error\n");
+//        return -1;
+//    }
+//    if(setTTYParity(ptty,8,'N',1)>0)
+//    {
+//        printf("setTTYParity() error\n");
+//        return -1;
+//    }
+//    idx = 0;
+//    while(1)
+//    {
+//        cc[0] = 0xFA;
+//        sendnTTY(ptty,&cc[0],1);
+//        nbyte = recvnTTY(ptty,cc,1);
+//        printf("%d:%02X\n",idx++,cc[0]);
+//    }
+//    cleanTTY(ptty);
+//}

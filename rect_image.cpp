@@ -103,7 +103,7 @@ void on_mouse(int event, int x, int y, int flags, void* ustc)
     //双击保存
     else if (event == CV_EVENT_LBUTTONDBLCLK)
     {
-        cvSaveImage("../matching_area.jpg", dst);
+//        cvSaveImage("../matching_area.jpg", dst);
         destroyAllWindows();
 //        key = true;
 

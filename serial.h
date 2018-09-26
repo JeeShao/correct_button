@@ -9,7 +9,8 @@
 #include <termios.h>
 #include <errno.h>
 #include <pthread.h>
-
+#include <iostream>
+using namespace std;
 // 串口设备信息结构
 typedef struct tty_info_t
 {
@@ -25,8 +26,8 @@ TTY_INFO *readyTTY(int id);
 int setTTYSpeed(TTY_INFO *ptty, int speed);
 int setTTYParity(TTY_INFO *ptty,int databits,int parity,int stopbits);
 int cleanTTY(TTY_INFO *ptty);
-int sendnTTY(TTY_INFO *ptty,char *pbuf,int size);
-int recvnTTY(TTY_INFO *ptty,char *pbuf,int size);
+int sendnTTY(TTY_INFO *ptty,unsigned char *pbuf,int size);
+int recvnTTY(TTY_INFO *ptty,unsigned char *pbuf,int size);
 int lockTTY(TTY_INFO *ptty);
 int unlockTTY(TTY_INFO *ptty);
 
@@ -39,4 +40,4 @@ int unlockTTY(TTY_INFO *ptty);
 （4） 向串口写入数据，调用函数sendnTTY（）；
 （5） 从串口读出数据，调用函数recvnTTY（）；
 （6） 操作完成后，需要调用函数cleanTTY（）来释放申请的串口信息接口；
-其中，lockTTY（）和unlockTTY（）在多线程中使用。在读写操作的前后，需要锁定和释放串口资源。 */
+（7）lockTTY（）和unlockTTY（）在多线程中使用。在读写操作的前后，锁定和释放串口资源。 */

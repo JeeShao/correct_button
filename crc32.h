@@ -58,7 +58,7 @@ int test(int argc, char **argv)
 {
     init_crc_table();
 //    char *str="sdfdsfdsfdsfdsfdssdfdsfdsfdsfdsssssssssssssfdsfdsfds";
-    unsigned char Num[9]={'1','2','3','4','5','6','7','8','9'};
-    printf("%llX",crc32(Num,9));
+    unsigned char Num[9]={0xDE,0xFF};
+    printf("%llX",crc32(Num,2));
     return 0;
 }
