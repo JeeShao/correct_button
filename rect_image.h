@@ -17,4 +17,4 @@ using  namespace cv;
 
 Mat pertImage(IplImage* srcImage);
 void on_mouse(int event, int x, int y, int flags, void* ustc);
-int* rectImage(IplImage* srcImage); //手动截图
+int* rectImage(Mat srcImage); //手动截图

@@ -20,7 +20,7 @@
 using namespace std;
 using namespace cv;
 
-#define GAUSS_DIFF 1
+#define GAUSS_DIFF 0
 #define INIT_FILE "20180706/init.txt"
 
 //const string FILE_PATH = "20180706/";
@@ -123,24 +123,101 @@ void lineTran(Mat src,Mat &dst, float k,int b)
     }
 }
 
-
+//拉普拉斯增强
 Mat laplace_enhance(Mat gray)
 {
     if (gray.empty())
     {
         cerr << "打开图片失败,请检查" << std::endl;
     }
-//    imshow("原图像", rgb);
     Mat imageEnhance;
     typedef cv::Matx<double, 3, 3> kernel;
     kernel m(0, -1, 0, 0, 3, 0, 0, -1, 0);
-//    Mat kernel = (Mat_<char>(3, 3) << 0, -1, 0, 0, 5, 0, 0, -1, 0);
+//    Mat kernel = (Mat_<uchar>(3, 3) << 0, -1, 0, 0, 5, 0, 0, -1, 0);
 
     filter2D(gray, imageEnhance, CV_8UC1, m);
+//    imshow("原图像", gray);
 //    imshow("拉普拉斯算子图像增强效果", imageEnhance);
 //    waitKey(0);
     return imageEnhance;
 }
+
+
+//log对数增强
+Mat log_enhance(Mat gray)
+{
+
+//    Mat imageLog(gray.size(), CV_32FC3);
+//    for (int i = 0; i < gray.rows; i++)
+//    {
+//        for (int j = 0; j < gray.cols; j++)
+//        {
+//            imageLog.at<Vec3f>(i, j)[0] = log(1 + gray.at<Vec3b>(i, j)[0]);
+//            imageLog.at<Vec3f>(i, j)[1] = log(1 + gray.at<Vec3b>(i, j)[1]);
+//            imageLog.at<Vec3f>(i, j)[2] = log(1 + gray.at<Vec3b>(i, j)[2]);
+//        }
+//    }
+//    //归一化到0~255
+//    normalize(imageLog, imageLog, 0, 255, CV_MINMAX);
+//    //转换成8bit图像显示
+//    convertScaleAbs(imageLog, imageLog);
+
+    Mat imageLog(gray.size(), CV_8UC1);
+    for (int i = 0; i < gray.rows; i++)
+    {
+        for (int j = 0; j < gray.cols; j++)
+        {
+            imageLog.at<uchar>(i, j) = log(1 + gray.at<uchar>(i, j));
+        }
+    }
+    //归一化到0~255
+    normalize(imageLog, imageLog, 0, 255, CV_MINMAX);
+    //转换成8bit图像显示
+//    convertScaleAbs(imageLog, imageLog);
+    imshow("Soure", gray);
+    imshow("after", imageLog);
+//    waitKey();
+    return imageLog;
+}
+
+//咖马变换增强
+Mat gamma_enhance(Mat gray)
+{
+//    Mat imageGamma(gray.size(), CV_32FC3);
+//    for (int i = 0; i < gray.rows; i++)
+//    {
+//        for (int j = 0; j < gray.cols; j++)
+//        {
+//            imageGamma.at<Vec3f>(i, j)[0] = (gray.at<Vec3b>(i, j)[0])*(gray.at<Vec3b>(i, j)[0])*(gray.at<Vec3b>(i, j)[0]);
+//            imageGamma.at<Vec3f>(i, j)[1] = (gray.at<Vec3b>(i, j)[1])*(gray.at<Vec3b>(i, j)[1])*(gray.at<Vec3b>(i, j)[1]);
+//            imageGamma.at<Vec3f>(i, j)[2] = (gray.at<Vec3b>(i, j)[2])*(gray.at<Vec3b>(i, j)[2])*(gray.at<Vec3b>(i, j)[2]);
+//        }
+//    }
+//    //归一化到0~255
+//    normalize(imageGamma, imageGamma, 0, 255, CV_MINMAX);
+//    //转换成8bit图像显示
+//    convertScaleAbs(imageGamma, imageGamma);
+
+
+    Mat imageGamma(gray.size(), CV_8UC1);
+    for (int i = 0; i < gray.rows; i++)
+    {
+        for (int j = 0; j < gray.cols; j++)
+        {
+            imageGamma.at<uchar>(i, j) = (gray.at<uchar>(i, j))*(gray.at<uchar>(i, j))*(gray.at<uchar>(i, j));
+        }
+    }
+    //归一化到0~255
+    normalize(imageGamma, imageGamma, 0, 255, CV_MINMAX);
+    //转换成8bit图像显示
+//    convertScaleAbs(imageGamma, imageGamma);
+    imshow("原图", gray);
+    imshow("伽马变换图像增强效果", imageGamma);
+    waitKey();
+    return imageGamma;
+}
+
+
 
 void init(Mat img, double button_radius){
     Point center = Point(660,533); //纽扣中心

@@ -25,6 +25,7 @@ TTY_INFO *readyTTY(int id)
         free(ptty);
         return NULL;
     }
+    cout<<"串口已打开"<<endl;
 
     // 取得并且保存原来的设置
     tcgetattr(ptty->fd,&ptty->otm);//  fd => otm
