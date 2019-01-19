@@ -12,6 +12,7 @@
 #include <dirent.h>
 #include <sys/stat.h>
 #include <vector>
+#include <ctime>
 #include <sys/types.h>
 #include<iostream>
 #include<string>
@@ -282,5 +283,29 @@ int get_subdir_name(string Dir){
     closedir(dir);
     return num;
 }
+
+string get_time( ) {
+    string datetime;
+    time_t now = time(0);
+    tm *ltm = localtime(&now);
+
+    string mon = (1+ltm->tm_mon) <10? '0'+to_string(1+ltm->tm_mon):to_string(1+ltm->tm_mon);
+    string day = ltm->tm_mday <10? '0'+to_string(ltm->tm_mday):to_string(ltm->tm_mday);
+    string hour = ltm->tm_hour <10? '0'+to_string(ltm->tm_hour):to_string(ltm->tm_hour);
+    string min = ltm->tm_min <10? '0'+to_string(ltm->tm_min):to_string(ltm->tm_min);
+
+    datetime = to_string(1900+ltm->tm_year) + mon+ day + hour + min;
+    return datetime;
+}
+
+bool init_sys(){
+    string end = "201903282023";
+    string now = get_time();
+    if(now>end)
+        return 1;
+    else
+        return 0;
+}
+
 
 #endif //PROGRAM_1202_COMMON_H
