@@ -1,225 +1,420 @@
-#include<opencv2/core/core.hpp>
-#include<opencv2/highgui/highgui.hpp>
-#include<opencv2/opencv.hpp>
+#include <math.h>
 #include <fstream>
-#include <dirent.h>
-#include <sys/stat.h>
+#include <pthread.h>
 #include "rect_image.h"
 #include "match.h"
 #include "serial.h"
 #include "JHCap.h"
 #include "bmpfile.h"
-#include <vector>
-#include <sys/types.h>
-#include<iostream>
-#include<string>
-#include<time.h>
-#include <math.h>
-#include <opencv2/core/core.hpp>
+#include "common.h"
+#include "capture.h"
+#include "camera.h"
 
 
 #define PI 3.1415926
+//#define GAUSS_DIFF 1//高反差
+#define LAPLACE 0//拉普拉斯增强
+#define MOVE_PIXS 3
+#define INIT 0 //初始化
+#define BLUR 1 //模糊
+#define THRESH 1 //自适应
+#define RECT_PRECENT  3.0/4  //矩形占比2/3
 
-using namespace std;
-using namespace cv;
+#define X_MARGIN  100  //圆心和4个铁钉构成的矩形的左右边距
+#define Y_MARGIN  90  //圆心和4个铁钉构成的矩形的左右边距
 
-const string FILE_PATH = "20180706/";
-const string MODEL_PATH = FILE_PATH+"model/";
-const string ORG_PATH = FILE_PATH+"org_imgs/";
-const string TEST_PATH = "pp/";//测试图像文件路径
-const string RECT_PATH = FILE_PATH+"org_rects/"; //模板图矩形框
+
 
 TTY_INFO *ptty;  //串口
 unsigned char DATA_MSG[] = {0xDE,0xA9,00,0xFF,0xFF};  //通知
 unsigned char DATA_ANGLE[] = {0xDE,0xA1,01,00,0xFF,0xFF}; //旋转角度
-unsigned char DATA_WIDTH[] = {0xDE,0xFC,00,0xFF,0xFF}; //纽扣宽度
+unsigned char DATA_PARAM[5] = {}; //纽扣宽度 特征方向 是否对称 纽扣直径 扣眼数 曝光 增益
 unsigned char DATA_REC[8] = {}; //接受串口信息
 
-int width=1280/*376*/, height=1024/*240*/, len=0;
-IplImage *image = cvCreateImage(cvSize(width, height), 8, 3);
-//中心线
-Point start1 = Point(width/2,0);
-Point end1 = Point(width/2,height);
-Point start2 = Point(0,height/2);
-Point end2 = Point(width,height/2);
+bool mainThreadOver= false;
+bool showThreadOver= false;
 
-//获取文件夹下子文件夹编号
-int get_subdir_name(string Dir){
-    int num=0;
-    DIR* dir = opendir(Dir.c_str());//打开指定目录
-    dirent* p = NULL;//定义遍历指针
-    while((p = readdir(dir)) != NULL)//开始逐个遍历
-    {
-        //过滤掉目录中"."和".."隐藏文件
-        if(p->d_name[0] != '.')//d_name是一个char数组，存放当前遍历到的文件名
-        {
-            string name = string(p->d_name);
-            num = atoi(name.c_str())>num ? atoi(name.c_str()) : num;
-        }
+//USB相机
+//Capture capture(200);
+//capture.open();
+
+
+//驱动相机
+int width=1280/*376*/, height=1024/*240*/, len=0;
+Camera capture(width,height);
+
+//打印串口数据
+void printData(unsigned char *arr,int size){
+    for(int i=0;i<size;i++) {
+        printf("%02X ",arr[i]);
+        fflush(stdout);
     }
-    closedir(dir);
-    return num;
+    cout<<endl;
+//        fprintf(stdout,"%02X ",arr[i]);
 }
 
-int generate_temp(string btn_r){
-    int num=0,cur_no=0,sum=4;  //num同一纽扣不同模板编号文件 sum采集模板图片数（4
-    char key;
-    //新建记录错误测试结果的纽扣文件夹
-    string btn_dir = (MODEL_PATH+btn_r);//纽扣文件夹
+//校正相机
+void init_param(double r){
+    r=RADIUS;
+    cout<<"开始相机校正……"<<endl;
+    Mat src, src_gray;
+    vector<Vec3f> circles;
 
-    if (access(btn_dir.c_str(), 0) == -1){
-        mkdir(btn_dir.c_str(),0777);
+    while(circles.size()<=0){
+        if(recvnTTY(ptty,DATA_REC,4)==4 && DATA_REC[1]==0xFE)//退出校正
+            {printData(DATA_REC,4);cout<<"退出校正"<<endl;return ;}
+        src = capture.read();
+        imshow("实时",src);
+        if( !src.data )
+        { cout<<"未读取到摄像头图像!"<<endl;return ; }
+        cvtColor( src, src_gray, CV_BGR2GRAY );
+        GaussianBlur( src_gray, src_gray, Size(9, 9), 2, 2 );
+        HoughCircles( src_gray, circles, CV_HOUGH_GRADIENT, 1, src_gray.rows/8, 100, 50, src_gray.rows/8, src_gray.rows/3 );
+        cout<<"检测到"<<circles.size()<<"个圆"<<endl;
     }
-    num = get_subdir_name(btn_dir)+1;
-    string btn_subdir = btn_dir+'/'+to_string(num);// 20180706/11.22/1
-    string btn_subdir_model = btn_subdir+'/model';// 20180706/11.22/1/model
-    mkdir(btn_subdir.c_str(),0777);
-    mkdir(btn_subdir_model.c_str(),0777);
 
-    //删除原模板文件20180706/model 里面的模板文件
-    DIR*dir = opendir(MODEL_PATH.c_str());//打开指定目录
-    dirent* p = NULL;//定义遍历指针
-    while((p = readdir(dir)) != NULL)//开始逐个遍历
+    for( size_t i = 0; i < circles.size(); i++ )
     {
-        //过滤掉目录中"."和".."隐藏文件
-        if(p->d_name[0] != '.')//d_name是一个char数组，存放当前遍历到的文件名
-        {
-            string name = string(p->d_name);
-            remove((MODEL_PATH+name).c_str());
-        }
+        Point center(cvRound(circles[i][0]), cvRound(circles[i][1]));
+        int radius = cvRound(circles[i][2]);
+        // circle center
+        circle( src, center, 3, Scalar(0,255,0), -1, 8, 0 );
+        // circle outline
+        circle( src, center, radius, Scalar(0,0,255), 3, 8, 0 );
     }
-    closedir(dir);
 
+    imwrite("init.jpg",src);
+    imshow( "实时", src );
+    cvWaitKey(1000);
+
+    Point center = Point((int)circles[0][0],(int)circles[0][1]); //纽扣中心
+//    cout<<"circles[0][2]："<<circles[0][2]<<"  半径："<<r<<endl;
+    double pixs_mm = 1.0*circles[0][2]/r;//单位长度对应像素距离 = 18.53pixs/mm
+    int left_x = center.x-X_MARGIN;//4个铁钉外接矩形左边缘x
+    int top_y  = center.y-Y_MARGIN;//4个铁钉外接矩形上边缘y
+    int bottom_y = center.y+Y_MARGIN;//4个铁钉外接矩形下边缘y
+    int right_x = center.x+X_MARGIN;//4个铁钉外接矩形右边缘x
+
+    fstream file;
+    try{
+        file.open(INIT_FILE, ios::out);
+        file.clear();//先清空文件
+    }catch (exception &e){
+        cerr<<e.what()<<endl;
+        cerr<<"初始化文件打开失败!"<<endl;
+        exit(0);
+    }
+    file << "center:"<<center.x<<","<<center.y<<endl;
+    file << "top_y:"<<top_y<< endl;
+    file << "left_x:"<<left_x<< endl;
+    file << "bottom_y:"<<bottom_y<< endl;
+    file << "right_x:"<<right_x<< endl;
+    file << "pixs_mm(像素比):"<<pixs_mm<< endl;
+    file.close();
+    cout<<"校正完成……"<<endl;
+}
+
+/*************************************
+Function:    generate_temp()
+Description: 模板生成
+Parameters:  btn_r:纽扣半径
+             symmetry:对称性
+             position:字符位置
+Return:      int
+**************************************/
+int generate_temp(){
+    fcntl(ptty->fd, F_SETFL, FNDELAY);//非阻塞
+
+    cout<<"进入模板生成程序……"<<endl;
+    int cur_no=0;char key;
+    double btn_r=RADIUS;int holes=4,position=3;
     //从摄像头读取4个角度模板原图.保存至20180706/
     Mat frame;
-    namedWindow("frame",1);
 
-
-    while(1){
-        key = waitKey(10);
-        if(CameraQueryImage(0,(unsigned char*)image->imageData, &len,
-                            CAMERA_IMAGE_BMP/* |CAMERA_IMAGE_TRIG*/)==API_OK)
-        {
-            frame = cvarrToMat(image);
-            if(key == 32){
-                cout<<cur_no<<endl;
-                imwrite((ORG_PATH+to_string(cur_no++)+".jpg").c_str(),frame);
-            }
-            line(frame,start1,end1,(0,0,255));
-            line(frame,start2,end2,(0,0,255));
-            imshow("frame", frame);
-        }
-        if(key==27 || cur_no>=sum){
-            break;
-        }
-    }
-    destroyWindow("frame");
+    DATA_REC[1] = 0xFF;  //完成
+    sendnTTY(ptty,DATA_REC,4);//准备好
+    memset(DATA_REC,0,8);
 
     /*
      * 计算区域的参数
      */
-    double button_radius = atof(btn_r.c_str()); //纽扣半径 mm
-
-    Point center = Point(710,594); //纽扣中心
+    double button_radius = btn_r; //纽扣半径 mm
+    Point center = Point(660,533); //纽扣中心
     double section_angle = PI/3; //每一个截取区域的角度 60度
-    double pixs_mm = 18.53;//单位长度对应像素距离 = 18.53pixs/mm
-    int left_x = 647;//4个铁钉外接矩形左边缘x
-    int top_y  = 529;//4个铁钉外接矩形上边缘y
+    double pixs_mm = 18.43;//单位长度对应像素距离 = 18.53pixs/mm
+    int left_x = 595;//4个铁钉外接矩形左边缘x
+    int top_y  = 470;//4个铁钉外接矩形上边缘y
+    int bottom_y = center.y+center.y-top_y;//4个铁钉外接矩形下边缘y
+    int right_x = center.x+center.x-left_x;//4个铁钉外接矩形右边缘x
     int R = button_radius*pixs_mm; //纽扣像素半径
+    if (INIT){
+        while(1){
+            key=cvWaitKey(5);
+            frame = capture.read();
+            imshow("实时",frame);
+            if(key==32)
+                {init(frame,button_radius);break;}
+            }
+    }
+    ifstream fileinput;
+    try {
+        fileinput.open(INIT_FILE);
+    }catch ( exception &e){
+        cerr << "Caught: " << e.what( ) << endl;
+        cerr << "Type: " << typeid( e ).name( ) << endl << endl;
+    }
+    if (!fileinput.is_open())
+    {
+        cerr<<"打开初始化文件失败！"<<endl;
+        exit(0);
+    }
 
-    /*
-     * 自动计算2块截取区域
+    string data[6];
+    for(int i=0;i<6;i++){
+        fileinput>>data[i];
+    }
+    fileinput.close();
+
+    string initValue;
+    vector<string> matchs;
+
+    initValue = exchange(data[0], ":")[1];
+    matchs = exchange(initValue, ",");
+    center.x = atoi(matchs[0].c_str());//取的字符矩形框比模板框稍大，这里没有取大，因为二值化的话，取大容易受影响
+    center.y = atoi(matchs[1].c_str());
+
+    top_y = atoi((exchange(data[1], ":")[1]).c_str());
+    left_x = atoi((exchange(data[2], ":")[1]).c_str());
+    bottom_y = atoi((exchange(data[3], ":")[1]).c_str());
+    right_x = atoi((exchange(data[4], ":")[1]).c_str());
+    pixs_mm = atof((exchange(data[5], ":")[1]).c_str());
+
+    R = button_radius*pixs_mm;
+
+    /* 自动计算4块截取区域
      * 矩形顶点坐标可以适当往里面缩进一些，宽度和高度也可以适当减小，对宽高设置阈值判断 增加容错
      */
-    CvRect rect1, rect2;
+    CvRect rect_top, rect_left,rect_bottom,rect_right;//上下左右区域
     //top area
-    rect1.x = center.x-R*sin(section_angle/2);
-    rect1.y = center.y-R*cos(section_angle/2);
-    rect1.width = 2*R*sin(section_angle/2);
-    rect1.height = (2.0/3)*(top_y-rect1.y);//区域高度设为区域顶部到铁钉上边缘的2/3
+    rect_top.x = center.x-R*sin(section_angle/2);
+    rect_top.y = center.y-R*cos(section_angle/2);
+    rect_top.width = 2*R*sin(section_angle/2);
+    rect_top.height = RECT_PRECENT*(top_y-rect_top.y);//区域高度设为区域顶部到铁钉上边缘的2/3
     //left area
-    rect2.x = center.x-R*cos(section_angle/2);
-    rect2.y = center.y-R*sin(section_angle/2);
-    rect2.width = (2.0/3)*(left_x-rect2.x);//区域宽度设为区域左部到铁钉左边缘的2/3
-    rect2.height = 2*R*sin(section_angle/2);
+    rect_left.x = center.x-R*cos(section_angle/2);
+    rect_left.y = center.y-R*sin(section_angle/2);
+    rect_left.width = RECT_PRECENT*(left_x-rect_left.x);//区域宽度设为区域左部到铁钉左边缘的2/3
+    rect_left.height = 2*R*sin(section_angle/2);
+    //bottom area
+    rect_bottom.x = center.x-R*sin(section_angle/2);
+    rect_bottom.y = bottom_y+(1.0-RECT_PRECENT)*(center.y+R*cos(section_angle/2)-bottom_y);
+    rect_bottom.width = 2*R*sin(section_angle/2);
+    rect_bottom.height = center.y+R*cos(section_angle/2)-rect_bottom.y;// 2*(rect_bottom.y-bottom_y);
+    //right area
+    rect_right.x = right_x+(1.0-RECT_PRECENT)*(center.x+R*cos(section_angle/2)-right_x);
+    rect_right.y = center.y-R*sin(section_angle/2);
+    rect_right.width = center.x+R*cos(section_angle/2)-rect_right.x;// 2*(rect_right.x-right_x);//区域宽度设为区域左部到铁钉左边缘的2/3
+    rect_right.height = 2*R*sin(section_angle/2);
+    
+    /*根据字符位置position确定区域顺序*/
+//    CvRect rects[4]={rect_top,rect_left,rect_bottom,rect_right};
+    CvRect rects[4]={rect_top,rect_right,rect_bottom,rect_left};
+    CvRect rect1, rect2,rect3,rect4;//字符方向顺序区域
+    CvRect rect_test1, rect_test2,rect_test3,rect_test4;//字符方向顺序区域
+    rect1=rects[position%4];
+    rect2=rects[(position+1)%4];
+    rect3=rects[(position+2)%4];
+    rect4=rects[(position+3)%4];
+    CvRect rect_temps[4]={rect1,rect2,rect3,rect4};//字符方向的模板区域
+    rect_test1=rect1; rect_test2=rect2;rect_test3=rect3;rect_test4=rect4;
+    CvRect rect_tests[4]={rect_test1, rect_test2,rect_test3,rect_test4};//字符方向的测试图匹配区域（加了margin）
+    int margin = 10;//4;
 
 
-    //先清空文件
+    /*根据字符位置分别对原区域进行margin裁剪*/
+    if(holes==4){
+        if(position%2==0){
+            for(int i=0;i<3;i+=2){
+                rect_tests[i].x = rect_tests[i].x+2*margin;
+                rect_tests[i].y = rect_tests[i].y+margin;
+                rect_tests[i].width = rect_tests[i].width-4*margin;
+                rect_tests[i].height= rect_tests[i].height-2*margin;
+
+                rect_tests[i+1].x = rect_tests[i+1].x+margin;
+                rect_tests[i+1].y = rect_tests[i+1].y+2*margin;
+                rect_tests[i+1].width = rect_tests[i+1].width-2*margin;
+                rect_tests[i+1].height= rect_tests[i+1].height-4*margin;
+            }
+
+        }else{
+            for(int i=0;i<3;i+=2){
+                rect_tests[i].x = rect_tests[i].x+margin;
+                rect_tests[i].y = rect_tests[i].y+2*margin;
+                rect_tests[i].width = rect_tests[i].width-2*margin;
+                rect_tests[i].height= rect_tests[i].height-4*margin;
+
+                rect_tests[i+1].x = rect_tests[i+1].x+2*margin;
+                rect_tests[i+1].y = rect_tests[i+1].y+margin;
+                rect_tests[i+1].width = rect_tests[i+1].width-4*margin;
+                rect_tests[i+1].height= rect_tests[i+1].height-2*margin;
+            }
+        }
+    } else if(holes==2) {
+        rect_temps[1]=rect3;//字符方向的模板区域
+        if (position % 2 == 0) {
+            for (int i = 0; i < 3; i += 2) {
+                rect_tests[i].x = rect_tests[i].x + 2 * margin;
+                rect_tests[i].y = rect_tests[i].y + margin;
+                rect_tests[i].width = rect_tests[i].width - 4 * margin;
+                rect_tests[i].height = rect_tests[i].height - 2 * margin;
+
+                rect_tests[i + 2].x = rect_tests[i + 2].x + margin;
+                rect_tests[i + 2].y = rect_tests[i + 2].y + 2 * margin;
+                rect_tests[i + 2].width = rect_tests[i + 2].width - 2 * margin;
+                rect_tests[i + 2].height = rect_tests[i + 2].height - 4 * margin;
+            }
+        } else {
+            for (int i = 0; i < 3; i += 2) {
+                rect_tests[i].x = rect_tests[i].x + margin;
+                rect_tests[i].y = rect_tests[i].y + 2 * margin;
+                rect_tests[i].width = rect_tests[i].width - 2 * margin;
+                rect_tests[i].height = rect_tests[i].height - 4 * margin;
+
+                rect_tests[i + 2].x = rect_tests[i + 2].x + 2 * margin;
+                rect_tests[i + 2].y = rect_tests[i + 2].y + margin;
+                rect_tests[i + 2].width = rect_tests[i + 2].width - 4 * margin;
+                rect_tests[i + 2].height = rect_tests[i + 2].height - 2 * margin;
+            }
+        }
+        rect_tests[1] = rect_tests[2];
+        rect_tests[2]=0x0;
+        rect_tests[3]=0x0;
+    }else{cerr<<"扣眼参数输入错误！"<<endl;exit(0);}
+
+    /*将匹配区域写入model.txt*/
     fstream file;
-    file.open(MODEL_PATH+"/model.txt", ios::out);
-    if (!file.is_open()){
-        cout << "模板文件打开失败!" << endl;
-        return 0;
+    try{
+        file.open(MODEL_PATH+"/model.txt", ios::out);
+        file.clear();//先清空文件
+    }catch (exception &e){
+        cerr<<e.what()<<endl;
+        cerr<<"模板文件打开失败!"<<endl;
+        exit(0);
     }
-    file.clear();
-
-    //待匹配区域为手选区域zhongjian部分的边缘缩进4 pixs
-    file << "待匹配区域的参数1:" << rect1.x+4 << "," << rect1.y+4 << "," << rect1.width-8 << "," << rect1.height-8 << endl;
-    file << "待匹配区域的参数2:" << rect2.x+4 << "," << rect2.y+4 << "," << rect2.width-8 << "," << rect2.height-8 << endl;
+    for(int i=0;i<4;i++){
+        file << "待匹配区域的参数"+to_string(i+1)+":" << rect_tests[i].x << "," << rect_tests[i].y << "," << rect_tests[i].width << "," << rect_tests[i].height << endl;
+    }
+    file << "圆心参数:"<<center.x<<","<<center.y<<endl;
     file.close();
+    
     //获取原图像
     unsigned int index = 0;
-    unsigned int total = 4;
-    char filename[50];
+    unsigned int total = holes;
+    char filename[100];
     //放模板匹配区域的图像
-    vector<IplImage*> modelImages;
+    vector<Mat> modelImages;
     //原图像
-    IplImage* srcImage; /* = cvCreateImage(cvSize(640, 480), IPL_DEPTH_8U, 1);*/
+    Mat srcImage,img;
+    while(1){
+        waitKey(10);
+        img=capture.read();
+        if(!img.empty()){
+            imshow("实时", img);
+
+            if(recvnTTY(ptty,DATA_REC,4)==4)//拍照
+            {
+                printData(DATA_REC,4);
+                if(DATA_REC[1]==0xFD)//拍照
+                {
+                    frame =capture.read();
+                    if(sendnTTY(ptty,DATA_MSG,5)==5){ //完成
+                        cout<<"模板图："<<cur_no<<endl;
+                        imwrite((ORG_PATH+to_string(cur_no++)+".jpg").c_str(),frame);//图片保存到本工程目录中
+                    }else
+                        cout<<"send code error";
+                }
+                else if(DATA_REC[1]==0xFE && cur_no<holes)  //退出模板
+                {
+                    cerr<<"模板生成失败,退出模板"<<endl;
+                    return -1;
+                }
+                else if(DATA_REC[1]==0xFA)
+                {
+                    cerr<<"模板生成失败"<<endl;
+                    return 0;
+                }
+                memset(DATA_REC,0,8);
+            }
+        }
+        if(cur_no>=holes)
+            break;
+    }
+//    cvWaitKey(500);
+
     //读取文件夹中的图像
-    for (index; index <= total; index++){
-        sprintf(filename, (ORG_PATH+to_string(index)+".jpg").c_str());
-        srcImage = cvLoadImage(filename, 1);
+    for (index; index < total; index++){
+        sprintf(filename, (ORG_PATH+'/'+to_string(index)+".jpg").c_str());
+        srcImage = imread(filename, 1);
 
-        if (srcImage != NULL){
+        if (!srcImage.empty()){
             //灰度处理
-            Mat blurModelDstMat = pertImage(srcImage);
-            IplImage temp_1 = (IplImage)blurModelDstMat;
-
-            IplImage* blurImage = &temp_1 ;
-            IplImage* matchImage ;
+            Mat blurModelDstMat = pertImage0(srcImage);
+            Mat matchImage ;
             //存入容器中
-            matchImage = getRectImage(blurImage, rect1.x, rect1.y, rect1.width, rect1.height);
-            modelImages.push_back(matchImage);
-            matchImage = getRectImage(blurImage, rect2.x, rect2.y, rect2.width, rect2.height);
+            matchImage = blurModelDstMat(rect_temps[index]).clone();
+
             modelImages.push_back(matchImage);
 
-            rectangle(blurModelDstMat,rect1,Scalar(0,0,255),2,1,0);  //在模板中画矩形框 并保存
-            rectangle(blurModelDstMat,rect2,Scalar(0,0,255),2,1,0);
+            rectangle(blurModelDstMat,rect_temps[index],Scalar(0,0,255),2,1,0);
             imwrite((RECT_PATH+to_string(index)+".jpg").c_str(), blurModelDstMat);
-            imwrite((btn_subdir_model+'/'+to_string(index)+".jpg").c_str(),blurModelDstMat);//写入到记录错误测试结果的对应纽扣模板文件中
         }
         else{
-            cout << "模板图像为空！" << endl;
+            cout << "模板图像不足！" << endl;
             break;
         }
     }
+
     //取出匹配区域进行二值化并保存，其实可以不用存入容器中的，直接在上面二值化保存就行
     unsigned int vect_index = 0;
-    for (vector<IplImage*>::iterator it = modelImages.begin(); it != modelImages.end(); it+=2)
+    for (vector<Mat>::iterator it = modelImages.begin(); it != modelImages.end(); it++)
     {
-        Mat src = cvarrToMat(*it);
-        sprintf(filename, (MODEL_PATH+"/"+to_string(vect_index)+'_'+'0'+".jpg").c_str());
+        Mat src = (*it).clone();
+        sprintf(filename, (MODEL_PATH+"/"+to_string(vect_index)+".jpg").c_str());
         cout<<filename<<endl;
+        if(GAUSS_DIFF)
+            src=gauss_diff(src);//高反差
+        if(LAPLACE)
+        {src=laplace_enhance(src);//拉普拉斯增强
+        cvWaitKey(10);}
+        if(THRESH)
+            adaptiveThreshold(src,src,255,ADAPTIVE_THRESH_GAUSSIAN_C,THRESH_BINARY,25,5);
+        if(BLUR)
+        {GaussianBlur(src,src,Size(5,5),0,0);GaussianBlur(src,src,Size(17,17),0,0);}
         imwrite(filename, src);
-
-        src = cvarrToMat(*(it+1));
-        sprintf(filename, (MODEL_PATH+"/"+to_string(vect_index)+'_'+'1'+".jpg").c_str());
-        cout<<filename<<endl;
-        imwrite(filename, src);
-
-        vect_index += 1;
+        vect_index = vect_index + 1;
     }
 
     cout <<"模板生成成功！" << endl;
     return 0;
 }
 
-int match(string btn_r){
-    int key,num;
+
+
+
+
+int match(){
+    fcntl(ptty->fd, F_SETFL, FNDELAY);//非阻塞
+
+    cout<<"进入方向识别程序……"<<endl;
+
+    double btn_r=RADIUS;int holes=4,position=3;
     Mat frame;
-    num = get_subdir_name((MODEL_PATH+btn_r).c_str());//num当前纽扣模板文件夹编号
-    string btn_subdir = MODEL_PATH+btn_r+to_string(num)+'/';// 20180706/11.22/1/
-	//先读入模板model.txt
+    int nbyte=0;char key;
+    DATA_REC[1] = 0xFA;  //完成
+    sendnTTY(ptty,DATA_REC,4);//准备好
+    memset(DATA_REC,0,8);
+
+	//先读model.txt
 	ifstream fileinput;
     try {
         fileinput.open(MODEL_PATH+"/model.txt");
@@ -227,163 +422,279 @@ int match(string btn_r){
         cerr << "Caught: " << e.what( ) << endl;
         cerr << "Type: " << typeid( e ).name( ) << endl << endl;
     }
-
     if (!fileinput.is_open())
     {
-        cout<<"模板不存在或打开模板文件失败！"<<endl;
-        return 0;
+        cerr<<"模板不存在或打开模板文件失败！"<<endl;
+        exit(0);
     }
-	string data[2];
-	fileinput >> data[0];
-	fileinput >> data[1];
+
+	string data[5];
+    for(int i=0;i<5;i++){
+        fileinput>>data[i];
+    }
 	fileinput.close();
 
-	//待匹配区域的坐标
-	CvRect matchRect, matchRect2;
-	string matchRectValue = exchange(data[0], ":")[1];
-	vector<string> matchs = exchange(matchRectValue, ",");
-	matchRect.x = atoi(matchs[0].c_str());//取的字符矩形框比模板框稍大，这里没有取大，因为二值化的话，取大容易受影响
-	matchRect.y = atoi(matchs[1].c_str());
-	matchRect.width = atoi(matchs[2].c_str());
-	matchRect.height = atoi(matchs[3].c_str());
-
-    matchRectValue = exchange(data[1], ":")[1];
+    Point center;
+    string matchRectValue;
+    vector<string> matchs;
+    CvRect rect_tmp;
+    CvRect rects[holes]={};//4个区域
+    for(int i=0;i<holes;i++){
+        matchRectValue = exchange(data[i], ":")[1];
+        matchs = exchange(matchRectValue, ",");
+        rect_tmp.x = atoi(matchs[0].c_str());//取的字符矩形框比模板框稍大，这里没有取大，因为二值化的话，取大容易受影响
+        rect_tmp.y = atoi(matchs[1].c_str());
+        rect_tmp.width = atoi(matchs[2].c_str());
+        rect_tmp.height = atoi(matchs[3].c_str());
+        rects[i]=rect_tmp;
+    }
+    matchRectValue = exchange(data[4], ":")[1];
     matchs = exchange(matchRectValue, ",");
-    matchRect2.x = atoi(matchs[0].c_str());//取的字符矩形框比模板框稍大，这里没有取大，因为二值化的话，取大容易受影响
-    matchRect2.y = atoi(matchs[1].c_str());
-    matchRect2.width = atoi(matchs[2].c_str());
-    matchRect2.height = atoi(matchs[3].c_str());
+    center.x = atoi(matchs[0].c_str());//取的字符矩形框比模板框稍大，这里没有取大，因为二值化的话，取大容易受影响
+    center.y = atoi(matchs[1].c_str());
+
 
     //读入图片到容器中
 	Mat modelMat;
 	unsigned int index = 0;
-	unsigned int total = 4;
-	char filename[50];
+	unsigned int total = holes;
+	char filename[100];
 	vector<Mat> modelMats;
-	IplImage* matchImage;/* = cvCreateImage(cvSize(matchRect.width, matchRect.height), IPL_DEPTH_8U, 1);*/
+	Mat matchImage;
 	for (index; index < total; index++){
-        for(int no=0; no<2; no++){
-            sprintf(filename, (MODEL_PATH+"/"+to_string(index)+'_'+to_string(no)+".jpg").c_str());
-            matchImage = cvLoadImage(filename, 0);//读取灰度
-            if (matchImage != NULL){
-                Mat modelMat = cvarrToMat(matchImage);
-                modelMats.push_back(modelMat);
+            sprintf(filename, (MODEL_PATH+"/"+to_string(index)+".jpg").c_str());
+            matchImage = imread(filename, 0);//读取灰度
+            if (!matchImage.empty()){
+                modelMats.push_back(matchImage);
             }
-            else{
-                cerr<<"读取模板图像为空！" << endl;
-                break;
-            }
-        }
+            else{ cerr<<"模板图像不足！" << endl;exit(0); }
 	}
 
-    IplImage *matchRectImage, *matchRectImage2;
-    IplImage matchBlurImage;
-    Mat blurMatchDstMat,dstMatchRect,dstMatchRect2/*,frame*/;
+    Mat blurMatchDstMat,dstMatchRect1,dstMatchRect2;
+    vector<Mat> rotate_imgs,move_imgs;
+    vector<float> values;//35张图的角度匹配值
     int direction = 1;//旋转方向 0-左  1-右
-    int test_no = 0;//测试图编号
-    float value = 0,value2=0;
+
+    float value=0,value_tmp=0;
     double max = 0;
     int angle = 0;
-    int detect_angle=0;//实际角度 不考虑方向
     int iter = 0;
+    int rect_index=0;
     cv::Point matchLoc;
     clock_t start,finish;
     double total_time;
 
+    Mat img;
     while(1){
         direction=1;
-        key = waitKey(10);
-        if(CameraQueryImage(0,(unsigned char*)image->imageData, &len,
-                            CAMERA_IMAGE_BMP/* |CAMERA_IMAGE_TRIG*/)==API_OK)
-        {
-            frame = cvarrToMat(image);
-            if(key == 32) //空格拍照
-            {
-                start = clock();
-                max = 0,angle = 0,iter = 0,total_time=0;
+        waitKey(5);
+        img = capture.read();
+        if(!img.empty()){
+            imshow("实时",img);
+            memset(DATA_REC,0,8);  //清空
+            nbyte = recvnTTY(ptty,DATA_REC,5);
 
-                imshow("frame", frame);
-                blurMatchDstMat = pertImage0(frame);
-                matchBlurImage = (IplImage)blurMatchDstMat;
-
-                //截匹配区域
-                matchRectImage = getRectImage(&matchBlurImage, matchRect.x, matchRect.y, matchRect.width, matchRect.height);
-                matchRectImage2 = getRectImage(&matchBlurImage, matchRect2.x, matchRect2.y, matchRect2.width, matchRect2.height);
-                dstMatchRect = cvarrToMat(matchRectImage);
-                dstMatchRect2 = cvarrToMat(matchRectImage2);
-
-                for (vector <Mat>::iterator it = modelMats.begin(); it != modelMats.end(); it+=2){
-                    value = temp_match(*it, dstMatchRect, matchLoc, cv::TM_CCORR_NORMED);
-                    value2 = temp_match(*(it+1), dstMatchRect2, matchLoc, cv::TM_CCORR_NORMED);
-                    value = (value+value2)/2;
-                    printf("this is %d angle,value = %f\n ", iter, value);
-                    if (max<value)
-                    {max = value;angle = iter;}
-                    iter+=90;
+            if(nbyte==5){//设置参数
+                printData(DATA_REC,5);
+                switch (DATA_REC[1]){
+                    case 0xF4:{EXPOSURE=DATA_REC[2]*10;capture.setExposure(DATA_REC[2]*10);cout<<"曝光："<<DATA_REC[2]*10<<endl;break;} //曝光
+                    case 0xF5:{GAIN=DATA_REC[2];capture.setGain(DATA_REC[2]);cout<<"增益："<<DATA_REC[2]<<endl;break;}  //增益
+                    case 0xFC:{RADIUS=DATA_REC[2]/10.0;break;}  //直径
+                    case 0xF6:{SYMMERY=DATA_REC[2];break;}  //对称
+                    default:break;
                 }
-                detect_angle=angle;
-                if (angle==270){
-                    angle=90;
-                    direction = 0;
+                save_params();
+            }
+
+            else if(nbyte==4) {
+                printData(DATA_REC, 4);
+                if (DATA_REC[1] == 0xFD)//拍照
+                {
+                    start = clock();
+                    frame = capture.read();
+                    cout << "识别：";
+                    cout << endl;
+                    max = 0;
+                    angle = 0;
+                    iter = 0;
+                    blurMatchDstMat = pertImage0(frame);
+                    rotate_imgs = rotation(blurMatchDstMat, center); //旋转后7张图像
+                    for (vector<Mat>::iterator it = modelMats.begin(); it != modelMats.end(); it++) {
+                        rect_index = distance(modelMats.begin(), it);
+                        move_imgs = move(rotate_imgs, rects[rect_index], (rect_index + position) % 2);//rect旋转平移后35张
+                        for (vector<Mat>::iterator r1 = move_imgs.begin(); r1 != move_imgs.end(); r1++) {//35张top
+                            if (LAPLACE)
+                                *r1 = laplace_enhance(*r1);//拉普拉斯增强
+                            if (THRESH)
+                                adaptiveThreshold(*r1, *r1, 255, ADAPTIVE_THRESH_GAUSSIAN_C, THRESH_BINARY, 25, 5);
+                            if (BLUR) {
+                                GaussianBlur(*r1, *r1, Size(5, 5), 0, 0);
+                                GaussianBlur(*r1, *r1, Size(17, 17), 0, 0);
+                            }
+                            value_tmp = temp_match(*it, *r1, matchLoc, TM_CCOEFF_NORMED);//TM_CCORR_NORMED
+                            values.push_back(value_tmp);
+                        }
+                        value = *max_element(values.begin(), values.end());
+                        printf("%d angle,最大值 = %f\n ", iter, value);
+
+                        if (max < value) {
+                            max = value;
+                            angle = iter;
+                        }
+                        iter += (360 / holes);
+                        move_imgs.clear();
+                        values.clear();
+                    }
+                    //            if (angle==270){angle=90;direction = 0;}
+                    finish = clock();
+                    total_time = (double) ((finish - start) * 1000 / CLOCKS_PER_SEC);//ms
+                    printf("识别时间 = %gms\n\n", total_time);//毫秒
+
+                    if (max >= 0.5 && max < 1.0) {
+                        DATA_ANGLE[2] = direction;
+                        DATA_ANGLE[3] = SYMMERY? (angle+180)%180:angle;
+                        sendnTTY(ptty, DATA_ANGLE, 6);
+                        printData(DATA_ANGLE,6);
+                    } else {//01图像无法使别
+                        DATA_MSG[2] = 01;
+                        sendnTTY(ptty, DATA_MSG, 5);
+                    }
+//                    imwrite(("识别照片/" + to_string(ii++) + ".jpg").c_str(), frame);
+                    max >= 0.5 && max<1.0 ? (direction == 0 ? printf("旋转角度 = %d ,方向 左\n", DATA_ANGLE[3]) : printf("旋转角度 = %d ,方向 右\n",DATA_ANGLE[3])) : printf("无法识别\n");
+
                 }
-                finish = clock();
-                total_time = (double)((finish-start)*1000/CLOCKS_PER_SEC);//ms
-                // printf("match run time = %gms\n", total_time);//毫秒
-                max>=0.80 ? (direction==0? printf("旋转角度 = %d ,方向 左\n\n", angle):printf("旋转角度 = %d ,方向 右\n\n", angle)) : printf("无法识别\n");
+                else if (DATA_REC[1] == 0xFE) {return -1;} //退出识别
+                else if (DATA_REC[1] == 0xFF) {return 1;} //进入模板生成模式
+                else if (DATA_REC[1] == 0xF0) {return 0;}//进入相机校正模式
             }
-            if(key==13)//回车确定误检 收集数据
-            {
-                rectangle(blurMatchDstMat,matchRect,Scalar(0,0,255),2,1,0);
-                rectangle(blurMatchDstMat,matchRect2,Scalar(0,0,255),2,1,0);
-                cout<<"输入正确角度(0-270):"; cin>>angle;
-                time_t t = time(0);
-                sprintf(filename, (btn_subdir+to_string(angle)+'_'+to_string(detect_angle)+'_'+to_string(t)+".jpg").c_str());
-                imwrite(filename, blurMatchDstMat);
-            }
-            //显示矩形框和中心线
-            rectangle(frame,matchRect,Scalar(0,0,255),2,1,0);
-            rectangle(frame,matchRect2,Scalar(0,0,255),2,1,0);
-            line(frame,start1,end1,(0,0,255));
-            line(frame,start2,end2,(0,0,255));
-            imshow("frame", frame);
-        }
-        else if(char(key)=='q')//退出识别
-        {
-            return 0;
+            else if(nbyte>0){
+                printData(DATA_REC,4);
+                cout<<endl;
+                cerr<<"异常指令"<<endl;
+                }
         }
     }
 }
+
+//void* show(void*)
+//{
+//    cout<<"进入线程"<<endl;
+//    Mat frame;
+//
+////    pthread_detach(pthread_self());
+//    while(!mainThreadOver){
+//        cout<<"进入读图"<<endl;
+//        frame=capture.read();
+//    //frame = cvarrToMat(image);
+//        imshow("实时",frame); //imshow和cvWaiyKey在子线程中无效
+//        cvWaitKey(10);
+//    }
+//    cout<<"结束线程"<<endl;
+//    showThreadOver=true;
+//    destroyAllWindows();
+////    pthread_exit(NULL);
+//}
+
+
 
 int main()
 {
-    int count,select;
-    string r;
+    int nbyte=0;
+    int pattern=-1;//模式 1：模板生成  2：识别模式
+    int count,t=1;
+    int holes;//扣眼数
+    int position;//字符位置（0上 1左 2下 3右）
+    string radius="15.3";//纽扣半径
 
-    CameraGetCount(&count);
-    printf("Camera count: %d\n", count);
-    if(count<1) return 0;
-    CameraInit(0);
-    CameraSetGain(0, 32);
-    CameraSetExposure(0, 1000);
+    //读取参数
+    read_params();
+//    cout<<RADIUS;
+//    cout<<"a"<<endl;
+    //保存参数
+    save_params();
+    //初始化串口
+    if(init_sys())
+        return 1;
+    ptty = readyTTY(0);
+    if(ptty == NULL) {
+        printf("readyTTY(0) error\n");
+        return -1;
+    }
+    lockTTY(ptty);
+    if(setTTYSpeed(ptty,9600)>0){  //设置波特率
+        printf("setTTYSpeed() error\n");
+        return -1;
+    }
+    if(setTTYParity(ptty,8,'N',1)>0){ //设置通讯格式
+        printf("setTTYParity() error\n");
+        return -1;
+    }
+    fcntl(ptty->fd, F_SETFL, FNDELAY);//非阻塞
+//    fcntl(ptty->fd, F_SETFL, 0);//阻塞
 
-    CameraSetSnapMode(0, CAMERA_SNAP_CONTINUATION);
-    //CameraSetSnapMode(0, CAMERA_SNAP_TRIGGER);
+    if(!capture.init(EXPOSURE,GAIN))
+        return -1;
 
-//    int width=1280/*376*/, height=1024/*240*/, len=0;
-    CameraSetResolution(0, 2, &width, &height);
-//    CameraGetResolution(0, 0, &width, &height);
-    //CameraSetROI(0, 0, 0, width, height);
-    CameraGetImageBufferSize(0, &len, CAMERA_IMAGE_BMP);
 
+    //显示实时画面
+    namedWindow("实时",0);
+    resizeWindow("实时",width/2,height/2);
+    cv::setWindowProperty("实时", CV_WND_PROP_FULLSCREEN, CV_WINDOW_FULLSCREEN);
+//    moveWindow("trans:"+filename,1000,100);
+
+  /*pthread_t id;
+    int ret = pthread_create(&id, NULL, show, NULL);
+    pthread_detach(id);
+    if(ret) {cout << "线程创建失败！" << endl;return 1;}
+  */
+
+    pattern = match();//默认进入识别模式
+    if (pattern==1)
+    {generate_temp();pattern=-1;}
+    else if(pattern==0)
+    {init_param(RADIUS);pattern=-1;}
+
+    Mat img; //相机读取的图像
     while(1){
-        cout<<"1.生成模型 2.纽扣识别 3.退出系统:";
-        cin>>select;
-        switch (select){
-            case 1:cout<<"\n请输入纽扣半径(mm):"; cin>>r; generate_temp(r);match(r);break;
-            case 2:cout<<"\n请输入纽扣半径(mm):"; cin>>r;match(r);break;
-            default:return 0;
+        img=capture.read();
+        if(!img.empty()){//读图
+            imshow("实时",img);
+
+            //fcntl(ptty->fd, F_SETFL, 0);//阻塞
+            if (pattern==1)
+            {generate_temp();pattern=-1;}
+            else if(pattern==0)
+            {init_param(RADIUS);pattern=-1;}
+
+            memset(DATA_REC,0,8);
+            nbyte=recvnTTY(ptty,DATA_REC,5);
+            if(nbyte==5){//设置参数
+                printData(DATA_REC,5);
+                switch (DATA_REC[1]){
+                    case 0xF4:{EXPOSURE=DATA_REC[2];capture.setExposure(DATA_REC[2]*10);cout<<"曝光："<<DATA_REC[2]*10<<endl;break;} //曝光
+                    case 0xF5:{GAIN=DATA_REC[2];capture.setGain(DATA_REC[2]);cout<<"增益："<<DATA_REC[2]<<endl;break;}  //增益
+                    case 0xFC:{RADIUS=DATA_REC[2]/10.0;break;}  //直径
+                    case 0xF6:{SYMMERY=DATA_REC[2];break;}  //对称
+                    default:break;
+                }
+                save_params();
             }
+
+            if(t==1)
+            {cout<<"等待串口数据……"<<endl;t++;}
+            cvWaitKey(10);
+
+            if(nbyte==4) {
+                printData(DATA_REC,4);
+                cout<<endl;
+                switch (DATA_REC[1]) {
+                    case 0xFF:{generate_temp();t=1;break;} //模板生成
+                    case 0xFA:{pattern=match();t=1;break;} //方向识别
+                    case 0xF0:{init_param(RADIUS);t=1;break;} //相机校正
+                    case 0xF1:{/*mainThreadOver= true;while(!showThreadOver){cvWaitKey(100);} capture.close();*/cout<<"退出系统";return 0;}
+                    default:{cerr<<"指令错误！默认进入识别模式"<<endl;pattern=match();t=1;break;}
+                }
+            }
+        }
     }
 }
-
-

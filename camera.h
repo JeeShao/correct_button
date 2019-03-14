@@ -4,6 +4,7 @@
 #include "JHCap.h"
 #include "bmpfile.h"
 #include<opencv2/core/core.hpp>
+#include <opencv2/imgproc.hpp>
 #include <opencv2/videoio.hpp>
 #include <iostream>
 
@@ -13,10 +14,12 @@ public:
     Camera(int width,int height);
     ~Camera();
 
+    bool init(int exporsure,int gain);
     Mat read();
     Mat getImg();
-//    void close();
-    bool init();
+    void setExposure(int value);
+    void setGain(int value);
+
 
 private:
     Mat frame;

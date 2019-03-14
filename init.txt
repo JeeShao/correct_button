@@ -1,0 +1,14 @@
+center:320,240
+top_y:100
+left_x:150
+bottom_y:350
+right_x:500
+pixs_mm(像素比):18.1046
+
+
+#center:647,510
+#top_y:420
+#left_x:551
+#bottom_y:600
+#right_x:743
+#pixs_mm(像素比):18.1046

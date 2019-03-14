@@ -3,12 +3,139 @@
 const string FILE_PATH = "../20180706/";
 const string MODEL_PATH = FILE_PATH+"model/";
 
+
+Mat illumination0(Mat bgr_image){
+	// READ RGB color image and convert it to Lab
+//    cv::Mat bgr_image = cv::imread("20180706/org_imgs/1.jpg");
+	cv::Mat lab_image;
+	cv::cvtColor(bgr_image, lab_image, CV_BGR2Lab);
+
+	// Extract the L channel
+	std::vector<cv::Mat> lab_planes(3);
+	cv::split(lab_image, lab_planes);  // now we have the L image in lab_planes[0]
+
+	// apply the CLAHE algorithm to the L channel
+	cv::Ptr<cv::CLAHE> clahe = cv::createCLAHE();
+	clahe->setClipLimit(4);
+	cv::Mat dst;
+	clahe->apply(lab_planes[0], dst);
+
+	// Merge the the color planes back into an Lab image
+	dst.copyTo(lab_planes[0]);
+	cv::merge(lab_planes, lab_image);
+
+	// convert back to RGB
+	cv::Mat image_clahe;
+	cv::cvtColor(lab_image, image_clahe, CV_Lab2BGR);
+	return image_clahe;
+	// display the results  (you might also want to see lab_planes[0] before and after).
+//    cv::imshow("image original", bgr_image);
+//    cv::imshow("image CLAHE", image_clahe);
+//    cv::waitKey();
+}
+
+
+//白平衡
+Mat whiteBalance0(Mat g_srcImage){
+	Mat dstImage;
+	vector<Mat> g_vChannels;
+
+	//分离通道
+	split(g_srcImage,g_vChannels);
+	Mat imageBlueChannel = g_vChannels.at(0);
+	Mat imageGreenChannel = g_vChannels.at(1);
+	Mat imageRedChannel = g_vChannels.at(2);
+
+	double imageBlueChannelAvg=0;
+	double imageGreenChannelAvg=0;
+	double imageRedChannelAvg=0;
+
+	//求各通道的平均值
+	imageBlueChannelAvg = mean(imageBlueChannel)[0];
+	imageGreenChannelAvg = mean(imageGreenChannel)[0];
+	imageRedChannelAvg = mean(imageRedChannel)[0];
+
+	//求出个通道所占增益
+	double K = (imageRedChannelAvg+imageGreenChannelAvg+imageRedChannelAvg)/3;
+	double Kb = K/imageBlueChannelAvg;
+	double Kg = K/imageGreenChannelAvg;
+	double Kr = K/imageRedChannelAvg;
+
+	//更新白平衡后的各通道BGR值
+	addWeighted(imageBlueChannel,Kb,0,0,0,imageBlueChannel);
+	addWeighted(imageGreenChannel,Kg,0,0,0,imageGreenChannel);
+	addWeighted(imageRedChannel,Kr,0,0,0,imageRedChannel);
+
+	merge(g_vChannels,dstImage);//图像各通道合并
+	return dstImage;
+}
+
+void unevenLightCompensate(Mat &image, int blockSize)
+{
+	if (image.channels() == 3) cvtColor(image, image, 7);
+	double average = mean(image)[0];
+	int rows_new = ceil(double(image.rows) / double(blockSize));
+	int cols_new = ceil(double(image.cols) / double(blockSize));
+	Mat blockImage;
+	blockImage = Mat::zeros(rows_new, cols_new, CV_32FC1);
+	for (int i = 0; i < rows_new; i++)
+	{
+		for (int j = 0; j < cols_new; j++)
+		{
+			int rowmin = i*blockSize;
+			int rowmax = (i + 1)*blockSize;
+			if (rowmax > image.rows) rowmax = image.rows;
+			int colmin = j*blockSize;
+			int colmax = (j + 1)*blockSize;
+			if (colmax > image.cols) colmax = image.cols;
+			Mat imageROI = image(Range(rowmin, rowmax), Range(colmin, colmax));
+			double temaver = mean(imageROI)[0];
+			blockImage.at<float>(i, j) = temaver;
+		}
+	}
+	blockImage = blockImage - average;
+	Mat blockImage2;
+	resize(blockImage, blockImage2, image.size(), (0, 0), (0, 0), INTER_CUBIC);
+	Mat image2;
+	image.convertTo(image2, CV_32FC1);
+	Mat dst = image2 - blockImage2;
+	dst.convertTo(image, CV_8UC1);
+}
+
+
 //图像预处理,灰度，滤波
 Mat pertImage0(Mat srcImage){
 	Mat grayImage;
-	cvtColor(srcImage, grayImage, CV_BGR2GRAY);
 	Mat blurImage;
-	GaussianBlur(grayImage, blurImage, Size(3, 3), 0, 0);
+	srcImage=whiteBalance0(srcImage);
+//	unevenLightCompensate(srcImage,12);
+	cvtColor(srcImage, grayImage, CV_BGR2GRAY);
+//    cv::normalize(grayImage, grayImage, 0,1, cv::NORM_L2);
+//	convertScaleAbs(grayImage,grayImage);
+//	Mat gainMat(grayImage.rows, grayImage.cols, CV_8UC1, Scalar::all(255));
+
+//	equalizeHist(grayImage,grayImage);
+
+    const int maxVal = 255;
+    int blockSize = 3;	//取值3、5、7....等
+    int constValue = 5;
+    int adaptiveMethod = 0;
+    int thresholdType = 1;
+    /*
+        自适应阈值算法
+        0:ADAPTIVE_THRESH_MEAN_C
+        1:ADAPTIVE_THRESH_GAUSSIAN_C
+        --------------------------------------
+        阈值类型
+        0:THRESH_BINARY
+        1:THRESH_BINARY_INV
+    */
+    //---------------【4】图像自适应阈值操作-------------------------
+//    adaptiveThreshold(grayImage, grayImage, maxVal, adaptiveMethod, thresholdType, blockSize, constValue);
+
+
+
+    GaussianBlur(grayImage, blurImage, Size(3, 3), 0, 0);
 	return blurImage;
 }
 

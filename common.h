@@ -17,12 +17,31 @@
 #include<iostream>
 #include<string>
 #include <typeinfo>
+#include <map>
 
 using namespace std;
 using namespace cv;
 
+const string FILE_PATH = "20180706/";
+const string MODEL_PATH = FILE_PATH+"model/";
+const string ORG_PATH = FILE_PATH+"org_imgs/";
+const string TEST_PATH = "pp/";//测试图像文件路径
+const string RECT_PATH = FILE_PATH+"org_rects/"; //模板图矩形框
+const string PARAMS_PATH = FILE_PATH+"params.txt"; //参数文件
+
 #define GAUSS_DIFF 0
 #define INIT_FILE "20180706/init.txt"
+
+double RADIUS=15.30;
+int SYMMERY = 0; //0-不对称 1-对称
+int EXPOSURE = 1200;
+int GAIN = 255;
+map<string,double> Param_map = { //参数字典
+        {"radius",15.30},
+        {"symmetry",0},
+        {"exposure",1200},
+        {"gain",255}
+};
 
 //const string FILE_PATH = "20180706/";
 //const string MODEL_PATH = FILE_PATH+"model/";
@@ -299,12 +318,64 @@ string get_time( ) {
 }
 
 bool init_sys(){
-    string end = "201903282023";
+    string end = "201905282023";
     string now = get_time();
     if(now>end)
         return 1;
     else
         return 0;
+}
+
+//void set_params(string param_name,double value){
+//    if(Param_map.find(param_name)!= Param_map.end()){
+//        Param_map[param_name] = value;
+//    }
+//}
+
+void save_params(){
+
+    fstream file;
+    try{
+        file.open(PARAMS_PATH.c_str(),ios::out);
+        file.clear();//先清空文件
+    }catch (exception &e){
+        cerr<<e.what()<<endl;
+        cerr<<"参数文件params.txt打开失败!"<<endl;
+        exit(0);
+    }
+
+    file << "RADIUS:"<<RADIUS<<endl;
+    file << "SYMMERY:"<<SYMMERY<<endl;
+    file << "EXPOSURE:"<<EXPOSURE<<endl;
+    file << "GAIN:"<<GAIN<<endl;
+    file.close();
+}
+
+void read_params(){
+    ifstream fileinput;
+    try {
+        fileinput.open(PARAMS_PATH.c_str());
+
+    }catch ( exception &e){
+        cerr << "Caught: " << e.what( ) << endl;
+        cerr << "Type: " << typeid( e ).name( ) << endl << endl;
+    }
+    if (!fileinput.is_open())
+    {
+        cerr<<"打开params.txt文件失败！"<<endl;
+        exit(0);
+    }
+
+    string data[4];
+    for(int i=0;i<4;i++){
+        fileinput>>data[i];
+    }
+    RADIUS = atof((exchange(data[0], ":")[1]).c_str());
+    SYMMERY = atoi((exchange(data[1], ":")[1]).c_str());
+    EXPOSURE = atoi((exchange(data[2], ":")[1]).c_str());
+    GAIN = atoi((exchange(data[3], ":")[1]).c_str());
+    fileinput.close();
+
 }
 
 

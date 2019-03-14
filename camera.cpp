@@ -14,7 +14,7 @@ Camera::Camera(int width=1280,int height=1024) :width(width),height(height)
 Camera::~Camera() {}
 
 //初始化相机
-bool Camera::init(){
+bool Camera::init(int exporsure,int gain){
     int count=0;
     CameraGetCount(&count);
     printf("Camera count: %d\n", count);
@@ -25,8 +25,8 @@ bool Camera::init(){
     CameraSetContrast(0,1);//对比度
     CameraSetSaturation(0,1.18);//饱和度
     CameraSetBlackLevel(0,10);//黑电平
-    CameraSetGain(0, 255);//增益150
-    CameraSetExposure(0, 1200);//曝光800
+    CameraSetGain(0, gain);//增益150
+    CameraSetExposure(0, exporsure);//曝光800
 //    CameraSetOption(0,CAMERA_IMAGE_RGB24);//图像格式
     CameraSetSnapMode(0, CAMERA_SNAP_CONTINUATION);
     CameraSetResolution(0, 2, &width, &height);
@@ -46,8 +46,20 @@ Mat Camera::read() {
         frame = cvarrToMat(image);
         return this->frame;
     }
+    if(!frame.empty())
+        putText(frame,"No image,Check Camera!",Point(300,870),FONT_HERSHEY_SIMPLEX,2,Scalar(0,0,255),4,8); //相机掉线
+//    std::cout<<"无图"<<std::endl;
+    return frame;
 }
 
 Mat Camera::getImg(){
     return this->frame;
+}
+
+void Camera::setExposure(int value) {
+    CameraSetExposure(0, value);
+}
+
+void Camera::setGain(int value) {
+    CameraSetGain(0, value);
 }
