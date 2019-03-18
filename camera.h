@@ -13,16 +13,15 @@ class Camera{
 public:
     Camera(int width,int height);
     ~Camera();
-
+    Mat frame;
     bool init(int exporsure,int gain);
-    Mat read();
+    int read();
     Mat getImg();
     void setExposure(int value);
     void setGain(int value);
 
 
 private:
-    Mat frame;
     int width;
     int height;
     int len;

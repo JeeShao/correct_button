@@ -36,3 +36,12 @@ Mat Capture::read(){
 Mat Capture::getImg(){
     return Q.front();
 }
+
+bool Capture::init(int exporsure,int gain){
+    return exporsure+gain;
+}
+void Capture::setExposure(int value){
+}
+void Capture::setGain(int value){
+
+}

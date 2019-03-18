@@ -34,8 +34,13 @@ const string PARAMS_PATH = FILE_PATH+"params.txt"; //参数文件
 
 double RADIUS=15.30;
 int SYMMERY = 0; //0-不对称 1-对称
+int HOLES = 4;
+int POSITION = 3;//字符位置
 int EXPOSURE = 1200;
 int GAIN = 255;
+
+string ANGLE_SHOW = "";
+
 map<string,double> Param_map = { //参数字典
         {"radius",15.30},
         {"symmetry",0},
@@ -346,6 +351,8 @@ void save_params(){
 
     file << "RADIUS:"<<RADIUS<<endl;
     file << "SYMMERY:"<<SYMMERY<<endl;
+    file << "HOLES:"<<HOLES<<endl;
+    file << "POSITION:"<<POSITION<<endl;
     file << "EXPOSURE:"<<EXPOSURE<<endl;
     file << "GAIN:"<<GAIN<<endl;
     file.close();
@@ -366,14 +373,16 @@ void read_params(){
         exit(0);
     }
 
-    string data[4];
-    for(int i=0;i<4;i++){
+    string data[6];
+    for(int i=0;i<6;i++){
         fileinput>>data[i];
     }
     RADIUS = atof((exchange(data[0], ":")[1]).c_str());
     SYMMERY = atoi((exchange(data[1], ":")[1]).c_str());
-    EXPOSURE = atoi((exchange(data[2], ":")[1]).c_str());
-    GAIN = atoi((exchange(data[3], ":")[1]).c_str());
+    HOLES = atoi((exchange(data[2], ":")[1]).c_str());
+    POSITION = atoi((exchange(data[3], ":")[1]).c_str());
+    EXPOSURE = atoi((exchange(data[4], ":")[1]).c_str());
+    GAIN = atoi((exchange(data[5], ":")[1]).c_str());
     fileinput.close();
 
 }

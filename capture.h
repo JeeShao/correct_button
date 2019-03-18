@@ -22,6 +22,9 @@ public:
     Mat getImg();
     void open();
     void close();
+    bool init(int exporsure,int gain);
+    void setExposure(int value);
+    void setGain(int value);
 
 private:
     std::queue<Mat> Q;

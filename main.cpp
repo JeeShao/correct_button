@@ -63,7 +63,12 @@ void init_param(double r){
     while(circles.size()<=0){
         if(recvnTTY(ptty,DATA_REC,4)==4 && DATA_REC[1]==0xFE)//退出校正
             {printData(DATA_REC,4);cout<<"退出校正"<<endl;return ;}
-        src = capture.read();
+        if(!capture.read()){
+            DATA_MSG[2]=02;
+            sendnTTY(ptty,DATA_MSG,5);
+        }
+        src = capture.frame;
+//        src = capture.read();
         imshow("实时",src);
         if( !src.data )
         { cout<<"未读取到摄像头图像!"<<endl;return ; }
@@ -86,6 +91,11 @@ void init_param(double r){
     imwrite("init.jpg",src);
     imshow( "实时", src );
     cvWaitKey(1000);
+
+    if(circles.size()>1){
+        cerr<<"校正失败"<<endl;
+        return ;
+    }
 
     Point center = Point((int)circles[0][0],(int)circles[0][1]); //纽扣中心
 //    cout<<"circles[0][2]："<<circles[0][2]<<"  半径："<<r<<endl;
@@ -123,11 +133,12 @@ Parameters:  btn_r:纽扣半径
 Return:      int
 **************************************/
 int generate_temp(){
+//    remove_files(MODEL_PATH.c_str());//清除模板文件
     fcntl(ptty->fd, F_SETFL, FNDELAY);//非阻塞
 
     cout<<"进入模板生成程序……"<<endl;
     int cur_no=0;char key;
-    double btn_r=RADIUS;int holes=4,position=3;
+    double btn_r=RADIUS;int holes=HOLES,position=POSITION;
     //从摄像头读取4个角度模板原图.保存至20180706/
     Mat frame;
 
@@ -150,7 +161,8 @@ int generate_temp(){
     if (INIT){
         while(1){
             key=cvWaitKey(5);
-            frame = capture.read();
+            capture.read();
+            frame = capture.frame;
             imshow("实时",frame);
             if(key==32)
                 {init(frame,button_radius);break;}
@@ -260,30 +272,31 @@ int generate_temp(){
             }
         }
     } else if(holes==2) {
+        cout<<"test"<<endl;
         rect_temps[1]=rect3;//字符方向的模板区域
         if (position % 2 == 0) {
-            for (int i = 0; i < 3; i += 2) {
+            for (int i = 0; i < 2; i += 2) {
                 rect_tests[i].x = rect_tests[i].x + 2 * margin;
                 rect_tests[i].y = rect_tests[i].y + margin;
                 rect_tests[i].width = rect_tests[i].width - 4 * margin;
                 rect_tests[i].height = rect_tests[i].height - 2 * margin;
 
-                rect_tests[i + 2].x = rect_tests[i + 2].x + margin;
-                rect_tests[i + 2].y = rect_tests[i + 2].y + 2 * margin;
-                rect_tests[i + 2].width = rect_tests[i + 2].width - 2 * margin;
-                rect_tests[i + 2].height = rect_tests[i + 2].height - 4 * margin;
+                rect_tests[i + 2].x = rect_tests[i + 2].x + 2 * margin;
+                rect_tests[i + 2].y = rect_tests[i + 2].y + margin;
+                rect_tests[i + 2].width = rect_tests[i + 2].width - 4 * margin;
+                rect_tests[i + 2].height = rect_tests[i + 2].height - 2 * margin;
             }
         } else {
-            for (int i = 0; i < 3; i += 2) {
+            for (int i = 0; i < 2; i += 2) {
                 rect_tests[i].x = rect_tests[i].x + margin;
                 rect_tests[i].y = rect_tests[i].y + 2 * margin;
                 rect_tests[i].width = rect_tests[i].width - 2 * margin;
                 rect_tests[i].height = rect_tests[i].height - 4 * margin;
 
-                rect_tests[i + 2].x = rect_tests[i + 2].x + 2 * margin;
-                rect_tests[i + 2].y = rect_tests[i + 2].y + margin;
-                rect_tests[i + 2].width = rect_tests[i + 2].width - 4 * margin;
-                rect_tests[i + 2].height = rect_tests[i + 2].height - 2 * margin;
+                rect_tests[i + 2].x = rect_tests[i + 2].x + margin;
+                rect_tests[i + 2].y = rect_tests[i + 2].y + 2 * margin;
+                rect_tests[i + 2].width = rect_tests[i + 2].width - 2 * margin;
+                rect_tests[i + 2].height = rect_tests[i + 2].height - 4 * margin;
             }
         }
         rect_tests[1] = rect_tests[2];
@@ -301,7 +314,7 @@ int generate_temp(){
         cerr<<"模板文件打开失败!"<<endl;
         exit(0);
     }
-    for(int i=0;i<4;i++){
+    for(int i=0;i<holes;i++){
         file << "待匹配区域的参数"+to_string(i+1)+":" << rect_tests[i].x << "," << rect_tests[i].y << "," << rect_tests[i].width << "," << rect_tests[i].height << endl;
     }
     file << "圆心参数:"<<center.x<<","<<center.y<<endl;
@@ -315,24 +328,51 @@ int generate_temp(){
     vector<Mat> modelImages;
     //原图像
     Mat srcImage,img;
+    int bytes=0;
     while(1){
         waitKey(10);
-        img=capture.read();
+        if(!capture.read()){
+            DATA_MSG[2]=02;
+            sendnTTY(ptty,DATA_MSG,5);
+        }
+        img = capture.frame;
         if(!img.empty()){
             imshow("实时", img);
+            bytes = recvnTTY(ptty,DATA_REC,5);
 
-            if(recvnTTY(ptty,DATA_REC,4)==4)//拍照
+            if(bytes==5){//设置参数
+                printData(DATA_REC,5);
+                switch (DATA_REC[1]){
+                    case 0xF4:{EXPOSURE=DATA_REC[2]*10;capture.setExposure(DATA_REC[2]*10);cout<<"曝光："<<DATA_REC[2]*10<<endl;break;} //曝光
+                    case 0xF5:{GAIN=DATA_REC[2];capture.setGain(DATA_REC[2]);cout<<"增益："<<(int)DATA_REC[2]<<endl;break;}  //增益
+                    case 0xF8:{HOLES=DATA_REC[2];cout<<"扣眼："<<(int)DATA_REC[2]<<endl;break;}  //扣眼
+                    case 0xF7:{POSITION=(DATA_REC[2]+3)%4;cout<<"字符位置："<<(int)DATA_REC[2]<<endl;break;}  //字符位置
+                    case 0xFC:{RADIUS=DATA_REC[2]/10.0;break;}  //直径
+                    case 0xF6:{SYMMERY=DATA_REC[2];break;}  //对称
+                    default:break;
+                }
+                save_params();
+            }
+
+            else if(bytes==4)//拍照
             {
                 printData(DATA_REC,4);
                 if(DATA_REC[1]==0xFD)//拍照
                 {
-                    frame =capture.read();
+                    if(!capture.read()){
+                        DATA_MSG[2]=02;
+                        sendnTTY(ptty,DATA_MSG,5);
+                    }
+                    frame = capture.frame;
+//                    frame =capture.read();
+                    DATA_MSG[02]=03;
                     if(sendnTTY(ptty,DATA_MSG,5)==5){ //完成
                         cout<<"模板图："<<cur_no<<endl;
                         imwrite((ORG_PATH+to_string(cur_no++)+".jpg").c_str(),frame);//图片保存到本工程目录中
                     }else
                         cout<<"send code error";
                 }
+                else if (DATA_REC[1] == 0xFB) {init_param(btn_r);}//进入相机校正模式
                 else if(DATA_REC[1]==0xFE && cur_no<holes)  //退出模板
                 {
                     cerr<<"模板生成失败,退出模板"<<endl;
@@ -341,7 +381,7 @@ int generate_temp(){
                 else if(DATA_REC[1]==0xFA)
                 {
                     cerr<<"模板生成失败"<<endl;
-                    return 0;
+                    return 2;
                 }
                 memset(DATA_REC,0,8);
             }
@@ -407,7 +447,7 @@ int match(){
 
     cout<<"进入方向识别程序……"<<endl;
 
-    double btn_r=RADIUS;int holes=4,position=3;
+    double btn_r=RADIUS;int holes=HOLES,position=POSITION;
     Mat frame;
     int nbyte=0;char key;
     DATA_REC[1] = 0xFA;  //完成
@@ -428,8 +468,8 @@ int match(){
         exit(0);
     }
 
-	string data[5];
-    for(int i=0;i<5;i++){
+	string data[holes+1];
+    for(int i=0;i<holes+1;i++){
         fileinput>>data[i];
     }
 	fileinput.close();
@@ -448,7 +488,7 @@ int match(){
         rect_tmp.height = atoi(matchs[3].c_str());
         rects[i]=rect_tmp;
     }
-    matchRectValue = exchange(data[4], ":")[1];
+    matchRectValue = exchange(data[holes], ":")[1];
     matchs = exchange(matchRectValue, ",");
     center.x = atoi(matchs[0].c_str());//取的字符矩形框比模板框稍大，这里没有取大，因为二值化的话，取大容易受影响
     center.y = atoi(matchs[1].c_str());
@@ -484,13 +524,25 @@ int match(){
     clock_t start,finish;
     double total_time;
 
-    Mat img;
+    Mat img,show_img;
+    ANGLE_SHOW="";
     while(1){
         direction=1;
         waitKey(5);
-        img = capture.read();
+        if(!capture.read()){
+            DATA_MSG[2]=02;
+            sendnTTY(ptty,DATA_MSG,5);
+        }
+        img = capture.frame;
+//        img = capture.read();
         if(!img.empty()){
-            imshow("实时",img);
+            show_img=img.clone();
+            if(ANGLE_SHOW=="ERROR")
+                putText(show_img,ANGLE_SHOW,Point(950,1000),FONT_HERSHEY_SIMPLEX,2,Scalar(0,0,255),4,5); //相机掉线
+            else if(!ANGLE_SHOW.empty())
+                putText(show_img,("result:"+ANGLE_SHOW),Point(950,1000),FONT_HERSHEY_SIMPLEX,2,Scalar(255,0,0),4,5); //相机掉线
+
+            imshow("实时",show_img);
             memset(DATA_REC,0,8);  //清空
             nbyte = recvnTTY(ptty,DATA_REC,5);
 
@@ -498,7 +550,9 @@ int match(){
                 printData(DATA_REC,5);
                 switch (DATA_REC[1]){
                     case 0xF4:{EXPOSURE=DATA_REC[2]*10;capture.setExposure(DATA_REC[2]*10);cout<<"曝光："<<DATA_REC[2]*10<<endl;break;} //曝光
-                    case 0xF5:{GAIN=DATA_REC[2];capture.setGain(DATA_REC[2]);cout<<"增益："<<DATA_REC[2]<<endl;break;}  //增益
+                    case 0xF5:{GAIN=DATA_REC[2];capture.setGain(DATA_REC[2]);cout<<"增益："<<(int)DATA_REC[2]<<endl;break;}  //增益
+                    case 0xF8:{HOLES=DATA_REC[2];cout<<"扣眼："<<(int)DATA_REC[2]<<endl;break;}  //扣眼
+                    case 0xF7:{POSITION=(DATA_REC[2]+3)%4;cout<<"字符位置："<<(int)DATA_REC[2]<<endl;break;}  //字符位置
                     case 0xFC:{RADIUS=DATA_REC[2]/10.0;break;}  //直径
                     case 0xF6:{SYMMERY=DATA_REC[2];break;}  //对称
                     default:break;
@@ -511,7 +565,12 @@ int match(){
                 if (DATA_REC[1] == 0xFD)//拍照
                 {
                     start = clock();
-                    frame = capture.read();
+                    if(!capture.read()){
+                        DATA_MSG[2]=02;
+                        sendnTTY(ptty,DATA_MSG,5);
+                    }
+                    frame = capture.frame;
+//                    frame = capture.read();
                     cout << "识别：";
                     cout << endl;
                     max = 0;
@@ -551,11 +610,13 @@ int match(){
                     printf("识别时间 = %gms\n\n", total_time);//毫秒
 
                     if (max >= 0.5 && max < 1.0) {
+                        ANGLE_SHOW = to_string(SYMMERY? (angle+180)%180:angle);
                         DATA_ANGLE[2] = direction;
                         DATA_ANGLE[3] = SYMMERY? (angle+180)%180:angle;
                         sendnTTY(ptty, DATA_ANGLE, 6);
                         printData(DATA_ANGLE,6);
                     } else {//01图像无法使别
+                        ANGLE_SHOW = "ERROR";
                         DATA_MSG[2] = 01;
                         sendnTTY(ptty, DATA_MSG, 5);
                     }
@@ -565,7 +626,7 @@ int match(){
                 }
                 else if (DATA_REC[1] == 0xFE) {return -1;} //退出识别
                 else if (DATA_REC[1] == 0xFF) {return 1;} //进入模板生成模式
-                else if (DATA_REC[1] == 0xF0) {return 0;}//进入相机校正模式
+                else if (DATA_REC[1] == 0xFB) {return 0;}//进入相机校正模式
             }
             else if(nbyte>0){
                 printData(DATA_REC,4);
@@ -600,18 +661,21 @@ int match(){
 int main()
 {
     int nbyte=0;
-    int pattern=-1;//模式 1：模板生成  2：识别模式
-    int count,t=1;
+    int match_pattern=-1;//识别程序返回值  1：模板生成  2：识别模式
+    int generate_pattern=-1;//模板生成程序返回值  2：识别模式
+    int t=1;
     int holes;//扣眼数
     int position;//字符位置（0上 1左 2下 3右）
-    string radius="15.3";//纽扣半径
-
+//    string radius="15.3";//纽扣半径
     //读取参数
     read_params();
+
 //    cout<<RADIUS;
 //    cout<<"a"<<endl;
     //保存参数
     save_params();
+//    capture.open();
+
     //初始化串口
     if(init_sys())
         return 1;
@@ -639,7 +703,7 @@ int main()
     //显示实时画面
     namedWindow("实时",0);
     resizeWindow("实时",width/2,height/2);
-    cv::setWindowProperty("实时", CV_WND_PROP_FULLSCREEN, CV_WINDOW_FULLSCREEN);
+//    cv::setWindowProperty("实时", CV_WND_PROP_FULLSCREEN, CV_WINDOW_FULLSCREEN);
 //    moveWindow("trans:"+filename,1000,100);
 
   /*pthread_t id;
@@ -648,31 +712,42 @@ int main()
     if(ret) {cout << "线程创建失败！" << endl;return 1;}
   */
 
-    pattern = match();//默认进入识别模式
-    if (pattern==1)
-    {generate_temp();pattern=-1;}
-    else if(pattern==0)
-    {init_param(RADIUS);pattern=-1;}
+    match_pattern = match();//默认进入识别模式
+    if (match_pattern==1)
+    {generate_pattern=generate_temp();match_pattern=-1;}
+    else if(match_pattern==0)
+    {init_param(RADIUS);match_pattern=-1;}
 
     Mat img; //相机读取的图像
+    int captureStatus;
     while(1){
-        img=capture.read();
+        captureStatus=capture.read();
+        if(!captureStatus){
+            DATA_MSG[2]=02;
+            sendnTTY(ptty,DATA_MSG,5);
+        }
+        img=capture.frame;
         if(!img.empty()){//读图
             imshow("实时",img);
 
             //fcntl(ptty->fd, F_SETFL, 0);//阻塞
-            if (pattern==1)
-            {generate_temp();pattern=-1;}
-            else if(pattern==0)
-            {init_param(RADIUS);pattern=-1;}
+            if (match_pattern==1)
+            {generate_temp();match_pattern=-1;}
+            else if(match_pattern==0)
+            {init_param(RADIUS);match_pattern=-1;}
+
+            if (generate_pattern==2)
+            {match_pattern=match();generate_pattern=-1;}
 
             memset(DATA_REC,0,8);
             nbyte=recvnTTY(ptty,DATA_REC,5);
             if(nbyte==5){//设置参数
                 printData(DATA_REC,5);
                 switch (DATA_REC[1]){
-                    case 0xF4:{EXPOSURE=DATA_REC[2];capture.setExposure(DATA_REC[2]*10);cout<<"曝光："<<DATA_REC[2]*10<<endl;break;} //曝光
-                    case 0xF5:{GAIN=DATA_REC[2];capture.setGain(DATA_REC[2]);cout<<"增益："<<DATA_REC[2]<<endl;break;}  //增益
+                    case 0xF4:{EXPOSURE=DATA_REC[2]*10;capture.setExposure(DATA_REC[2]*10);cout<<"曝光："<<DATA_REC[2]*10<<endl;break;} //曝光
+                    case 0xF5:{GAIN=DATA_REC[2];capture.setGain(DATA_REC[2]);cout<<"增益："<<(int)DATA_REC[2]<<endl;break;}  //增益
+                    case 0xF8:{HOLES=DATA_REC[2];cout<<"扣眼："<<(int)DATA_REC[2]<<endl;break;}  //扣眼
+                    case 0xF7:{POSITION=(DATA_REC[2]+3)%4;cout<<"字符位置："<<(int)DATA_REC[2]<<endl;break;}  //字符位置
                     case 0xFC:{RADIUS=DATA_REC[2]/10.0;break;}  //直径
                     case 0xF6:{SYMMERY=DATA_REC[2];break;}  //对称
                     default:break;
@@ -689,10 +764,10 @@ int main()
                 cout<<endl;
                 switch (DATA_REC[1]) {
                     case 0xFF:{generate_temp();t=1;break;} //模板生成
-                    case 0xFA:{pattern=match();t=1;break;} //方向识别
-                    case 0xF0:{init_param(RADIUS);t=1;break;} //相机校正
+                    case 0xFA:{match_pattern=match();t=1;break;} //方向识别
+                    case 0xFB:{init_param(RADIUS);t=1;break;} //相机校正
                     case 0xF1:{/*mainThreadOver= true;while(!showThreadOver){cvWaitKey(100);} capture.close();*/cout<<"退出系统";return 0;}
-                    default:{cerr<<"指令错误！默认进入识别模式"<<endl;pattern=match();t=1;break;}
+                    default:{cerr<<"指令错误！默认进入识别模式"<<endl;match_pattern=match();t=1;break;}
                 }
             }
         }

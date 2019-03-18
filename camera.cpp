@@ -40,16 +40,19 @@ bool Camera::init(int exporsure,int gain){
 //        capture.release();
 //}
 
-Mat Camera::read() {
+int Camera::read() {
     if (CameraQueryImage(0, (unsigned char *) image->imageData, &len,
                          CAMERA_IMAGE_BMP/* |CAMERA_IMAGE_TRIG*/) == API_OK) {
         frame = cvarrToMat(image);
-        return this->frame;
+        return true;
     }
-    if(!frame.empty())
-        putText(frame,"No image,Check Camera!",Point(300,870),FONT_HERSHEY_SIMPLEX,2,Scalar(0,0,255),4,8); //相机掉线
-//    std::cout<<"无图"<<std::endl;
-    return frame;
+    putText(frame,"Camera error",Point(850,1000),FONT_HERSHEY_SIMPLEX,2,Scalar(0,0,255),4,5); //相机掉线
+    return false;
+//    if(!frame.empty())
+//        putText(frame,"Camera error",Point(950,1000),FONT_HERSHEY_SIMPLEX,2,Scalar(0,0,255),4,5); //相机掉线
+////      putText(frame,"No image,Check Camera!",Point(300,870),FONT_HERSHEY_SIMPLEX,2,Scalar(0,0,255),4,8); //相机掉线
+////    std::cout<<"无图"<<std::endl;
+//    return frame;/
 }
 
 Mat Camera::getImg(){
