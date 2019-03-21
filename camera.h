@@ -15,6 +15,7 @@ public:
     ~Camera();
     Mat frame;
     bool init(int exporsure,int gain);
+    void close();
     int read();
     Mat getImg();
     void setExposure(int value);

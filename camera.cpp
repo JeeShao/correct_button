@@ -1,7 +1,3 @@
-//
-// Created by app on 19-1-20.
-//
-
 #include "camera.h"
 
 Camera::Camera(int width=1280,int height=1024) :width(width),height(height)
@@ -35,10 +31,9 @@ bool Camera::init(int exporsure,int gain){
 }
 
 
-//void Camera::close() {
-//    if(capture.isOpened())
-//        capture.release();
-//}
+void Camera::close() {
+    CameraFree(0);
+}
 
 int Camera::read() {
     if (CameraQueryImage(0, (unsigned char *) image->imageData, &len,
@@ -46,13 +41,7 @@ int Camera::read() {
         frame = cvarrToMat(image);
         return true;
     }
-    putText(frame,"Camera error",Point(850,1000),FONT_HERSHEY_SIMPLEX,2,Scalar(0,0,255),4,5); //相机掉线
-    return false;
-//    if(!frame.empty())
-//        putText(frame,"Camera error",Point(950,1000),FONT_HERSHEY_SIMPLEX,2,Scalar(0,0,255),4,5); //相机掉线
-////      putText(frame,"No image,Check Camera!",Point(300,870),FONT_HERSHEY_SIMPLEX,2,Scalar(0,0,255),4,8); //相机掉线
-////    std::cout<<"无图"<<std::endl;
-//    return frame;/
+   return false;
 }
 
 Mat Camera::getImg(){

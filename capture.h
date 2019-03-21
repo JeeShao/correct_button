@@ -7,6 +7,7 @@
 
 #include<opencv2/core/core.hpp>
 #include <opencv2/videoio.hpp>
+#include <opencv2/opencv.hpp>
 #include <iostream>
 #include <queue>
 //#include<opencv2/highgui/highgui.hpp>
@@ -18,19 +19,25 @@ public:
     Capture(int device);
     ~Capture();
 
-    Mat read();
-    Mat getImg();
+    Mat frame;
+    Mat getShowImg();
+    Mat getImg1();
     void open();
     void close();
     bool init(int exporsure,int gain);
     void setExposure(int value);
     void setGain(int value);
+    Mat getNextFrame();
+    int read();
+
 
 private:
     std::queue<Mat> Q;
     int device;
-    Mat frame;
+    Mat showImg;
+    Mat currentFrame;
     VideoCapture capture;
+
 };
 
 
