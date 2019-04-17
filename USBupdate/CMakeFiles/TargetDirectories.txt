@@ -1,0 +1,3 @@
+/home/app/update/CMakeFiles/rebuild_cache.dir
+/home/app/update/CMakeFiles/edit_cache.dir
+/home/app/update/CMakeFiles/start.dir

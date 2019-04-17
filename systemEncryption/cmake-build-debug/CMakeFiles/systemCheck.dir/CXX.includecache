@@ -1,0 +1,26 @@
+#IncludeRegexLine: ^[ 	]*#[ 	]*(include|import)[ 	]*[<"]([^">]+)([">])
+
+#IncludeRegexScan: ^.*$
+
+#IncludeRegexComplain: ^$
+
+#IncludeRegexTransform: 
+
+/home/app/CLionProjects/systemCheck/main.cpp
+stdio.h
+-
+iostream
+-
+fstream
+-
+linux/hdreg.h
+-
+sys/ioctl.h
+-
+fcntl.h
+-
+unistd.h
+-
+string.h
+-
+
