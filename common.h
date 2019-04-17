@@ -13,6 +13,7 @@
 #include<ctime>
 #include<sys/types.h>
 #include<iostream>
+#include<fstream>
 #include<string>
 #include<typeinfo>
 #include<map>
@@ -27,6 +28,7 @@ using namespace cv;
 #define RECT_PRECENT  3.0/4  //矩形占比2/3
 #define X_MARGIN  100  //圆心和4个铁钉构成的矩形的左右边距
 #define Y_MARGIN  90  //圆心和4个铁钉构成的矩形的左右边距
+#define DEBUG 0 //调试log打印
 
 extern const string FILE_PATH;
 extern const string MODEL_PATH;
@@ -34,6 +36,8 @@ extern const string ORG_PATH;
 extern const string RECT_PATH;
 extern const string PARAMS_PATH;
 extern const string INIT_FILE;
+extern const string LOG_FILE;
+extern const string LOGO_FILE;
 
 extern double RADIUS;
 extern int SYMMERY;
@@ -79,6 +83,8 @@ double temp_match(cv::Mat image, cv::Mat tepl, cv::Point &point, int method);
 string get_time( );
 
 bool init_sys();
+
+void writeLog(const char* logStr);
 
 void save_params();
 

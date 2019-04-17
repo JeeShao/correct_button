@@ -9,18 +9,18 @@ MainWindow::MainWindow(QWidget *parent)
         : QMainWindow(parent)
 {
     //屏幕分辨率
-    screen_w=600;
+    screen_w=768;
     screen_h=1024;
     //中心线
-    start1 = Point(width/2,0);
-    end1 = Point(width/2,height);
-    start2 = Point(0,height/2);
-    end2 = Point(width,height/2);
+    start1 = Point(width/2,height/2-100);
+    end1 = Point(width/2,height/2+100);
+    start2 = Point(width/2-100,height/2);
+    end2 = Point(width/2+100,height/2);
     //90度
     matrix.rotate(90.0);
     mainwindow=this;
-    cap = new Capture(200);
-    cap->open();
+    cap = new Camera(1280,1024);
+//    cap->open();
     setupUi(this);
     this->update();
 }
@@ -38,32 +38,32 @@ void MainWindow::setupUi(QMainWindow *MainWindow)
 {
     //状态，角度字体
     font1.setFamily(QString::fromUtf8("\346\245\267\344\275\223"));
-    font1.setPointSize(16);
+    font1.setPointSize(25);
     font1.setBold(true);
-//    font1.setWeight(30);
 
     if (MainWindow->objectName().isEmpty())
         MainWindow->setObjectName("MainWindow");
-    MainWindow->resize(screen_w, screen_h);
+    MainWindow->resize(QApplication::desktop()->height(), QApplication::desktop()->width());
+//    MainWindow->setFixedSize(QApplication::desktop()->height(), QApplication::desktop()->width());
     centralwidget = new QWidget(MainWindow);
     centralwidget->setObjectName("centralwidget");
 
     //logo
     label_logo = new QLabel(centralwidget);
     label_logo->setObjectName("label_logo");
-    label_logo->setGeometry(QRect(110, 15, 25, 29));
+    label_logo->setGeometry(QRect(120, 81, 131*0.5, 149*0.5*0.75));// 131*149
     label_logo->setAlignment(Qt::AlignCenter);
     label_logo->setScaledContents(true);
-    QPixmap pix = QPixmap("/home/app/CLionProjects/program_qt/logo.jpg");
+    QPixmap pix = QPixmap(LOGO_FILE.c_str());
     label_logo->setPixmap(pix);
 
     //公司名称
     label_title = new QLabel(centralwidget);
     label_title->setObjectName("label_title");
-    label_title->setGeometry(QRect(145, 10, 350, 41));
+    label_title->setGeometry(QRect(206, 91, 450, 50*0.75));
     QFont font;
     font.setFamily(QString::fromUtf8("\346\245\267\344\275\223"));
-    font.setPointSize(22);
+    font.setPointSize(28);
     font.setBold(true);
     font.setWeight(75);
     label_title->setFont(font);
@@ -71,7 +71,7 @@ void MainWindow::setupUi(QMainWindow *MainWindow)
     //显示画面
     label_frame = new Mylabel(centralwidget);
     label_frame->setObjectName("label_frame");
-    label_frame->setGeometry(QRect(60, 100, 480, 600));
+    label_frame->setGeometry(QRect(0, 152, screen_w, (double)width/height*screen_w*0.75));
     label_frame->setLayoutDirection(Qt::LeftToRight);
     label_frame->setScaledContents(true); //图片自适应窗口大小
     label_frame->setAlignment(Qt::AlignCenter);
@@ -81,7 +81,7 @@ void MainWindow::setupUi(QMainWindow *MainWindow)
     //状态显示
     label_status = new QLabel(centralwidget);
     label_status->setObjectName("label_status");
-    label_status->setGeometry(QRect(60, 774, 50, 50));
+    label_status->setGeometry(QRect(80, 892, 80, 50*0.75));
     label_status->setFont(font1);
     //    label_angle->setWindowOpacity(1);//透明度 1-不透明
     label_status->setWindowFlags(Qt::FramelessWindowHint);
@@ -89,7 +89,7 @@ void MainWindow::setupUi(QMainWindow *MainWindow)
     //状态值
     label_status_val = new QLabel(centralwidget);
     label_status_val->setObjectName("label_status_val");
-    label_status_val->setGeometry(QRect(110, 774, 100, 50));
+    label_status_val->setGeometry(QRect(180, 892, 150, 50*0.75));
     label_status_val->setFont(font1);
     label_status_val->setStyleSheet("color:green;");
     label_status_val->setWindowFlags(Qt::FramelessWindowHint);
@@ -99,7 +99,7 @@ void MainWindow::setupUi(QMainWindow *MainWindow)
     //角度显示
     label_angle = new QLabel(centralwidget);
     label_angle->setObjectName("label_angle");
-    label_angle->setGeometry(QRect(400, 774, 100, 50));
+    label_angle->setGeometry(QRect(464, 892, 160, 50*0.75));
     label_angle->setFont(font1);
     label_angle->setWindowFlags(Qt::FramelessWindowHint);
     label_angle->setAttribute(Qt::WA_TranslucentBackground);
@@ -107,7 +107,7 @@ void MainWindow::setupUi(QMainWindow *MainWindow)
     //角度值
     label_angle_val = new QLabel(centralwidget);
     label_angle_val->setObjectName("label_angle_val");
-    label_angle_val->setGeometry(QRect(500, 774, 90, 50));
+    label_angle_val->setGeometry(QRect(620, 892, 145, 50*0.75));
     label_angle_val->setFont(font1);
     label_angle_val->setWindowOpacity(0);//透明度 1-不透明
     label_angle_val->setWindowFlags(Qt::FramelessWindowHint);
@@ -122,8 +122,8 @@ void MainWindow::setupUi(QMainWindow *MainWindow)
 void MainWindow::retranslateUi(QMainWindow *MainWindow)
 {
     MainWindow->setWindowTitle("实时图像");
-    MainWindow->setStyleSheet("background-color: rgba( 212, 212, 212, 50% );");
-//    MainWindow->setStyleSheet("background-image: url(./bg1.jpg);");
+    MainWindow->setStyleSheet("background-color: rgba( 192, 233, 255, 100% );");
+//    MainWindow->setStyleSheet("background-image: url(../20180706/bg.jpg);");
     label_title->setText("上海鸠兹智能科技有限公司");
     label_status->setText("状态:");
     label_status_val->setText(QString(STATUS_SHOW.c_str()));
@@ -154,14 +154,17 @@ int MainWindow::startFun()
     while(initPtty()!=1)//串口异常
     {
         label_frame->setText("串口异常");
+        //writeLog("串口异常");
         usleep(10000);//10ms
     }
 
     while(!cap->init(EXPOSURE,GAIN))//启动程序时未插上相机
     {
         label_frame->setText("连接相机失败");
+        //writeLog("连接相机失败");
         usleep(10000);//10ms
     }
+    sleep(2);//等待相机就位
     match_pattern = match();//默认进入识别模式
     if (match_pattern==1)
     {generate_pattern=generate_temp();match_pattern=-1;}
@@ -192,18 +195,22 @@ int MainWindow::startFun()
                 setParams();
             }
             if(t==1)
-            {cout<<"等待串口数据……"<<endl;t++;}
+            {if(DEBUG) cout<<"等待串口数据……"<<endl;t++;}
             usleep(1000);//us
 
             if(nbyte==4) {
-                printData(DATA_REC,4);
-                cout<<endl;
+                if(DEBUG)
+                {
+                    printData(DATA_REC,4);
+                    cout<<endl;
+                }
+
                 switch (DATA_REC[1]) {
                     case 0xFF:{generate_temp();t=1;break;} //模板生成
                     case 0xFA:{match_pattern=match();t=1;break;} //方向识别
                     case 0xFB:{init_param(RADIUS);t=1;break;} //相机校正
-                    case 0xF1:{cout<<"退出系统";return 0;}
-                    default:{cerr<<"指令错误！默认进入识别模式"<<endl;match_pattern=match();t=1;break;}
+                    case 0xF1:{if(DEBUG) cout<<"退出系统";return 0;}
+                    default:{if(DEBUG) cerr<<"指令错误！默认进入识别模式"<<endl;writeLog("指令错误！默认进入识别模式");match_pattern=match();t=1;break;}
                 }
             }
         }
@@ -213,12 +220,12 @@ int MainWindow::startFun()
 //生成模板
 int MainWindow::generate_temp()
 {
-    ANGLE_SHOW="null";
+    ANGLE_SHOW="NULL";
     updateAngle();
 //    remove_files(MODEL_PATH.c_str());//清除模板文件
     fcntl(ptty->fd, F_SETFL, FNDELAY);//非阻塞
-
-    cout<<"进入模板生成程序……"<<endl;
+    if(DEBUG)
+        cout<<"进入模板生成程序……"<<endl;
     int cur_no=0;
     double btn_r=RADIUS;int holes=HOLES,position=POSITION;
     //从摄像头读取4个角度模板原图.保存至20180706/
@@ -246,10 +253,13 @@ int MainWindow::generate_temp()
     }catch ( exception &e){
         cerr << "Caught: " << e.what( ) << endl;
         cerr << "Type: " << typeid( e ).name( ) << endl << endl;
+        writeLog(e.what());
     }
     if (!fileinput.is_open())
     {
         cerr<<"打开初始化文件失败！"<<endl;
+        writeLog("打开初始化文件失败");
+        return -1;
         //exit(0);
     }
 
@@ -371,7 +381,7 @@ int MainWindow::generate_temp()
         rect_tests[1] = rect_tests[2];
         rect_tests[2]=0x0;
         rect_tests[3]=0x0;
-    }else{cerr<<"扣眼参数输入错误！"<<endl;return -1;}
+    }else{cerr<<"扣眼参数输入错误！"<<endl;writeLog("扣眼参数输入错误");return -1;}
 
     /*将匹配区域写入model.txt*/
     fstream file;
@@ -380,7 +390,8 @@ int MainWindow::generate_temp()
         file.clear();//先清空文件
     }catch (exception &e){
         cerr<<e.what()<<endl;
-        cerr<<"模板文件打开失败!"<<endl;
+        cerr<<MODEL_PATH+"/model.txt:模板文件打开失败!"<<endl;
+        writeLog((MODEL_PATH+"/model.txt:模板文件打开失败!").c_str());
         return -1;
     }
     for(int i=0;i<holes;i++){
@@ -402,7 +413,9 @@ int MainWindow::generate_temp()
     while(1){
         capStatus=cap->read();
         if(!capStatus){
-            sendCapLoseMsg();
+            if(STATUS_SHOW != "相机掉线"){
+                sendCapLoseMsg();
+            }
         }
         img = cap->frame;
         if(capStatus){
@@ -413,7 +426,8 @@ int MainWindow::generate_temp()
             }
             else if(bytes==4)//拍照
             {
-                printData(DATA_REC,4);
+                if(DEBUG)
+                    printData(DATA_REC,4);
                 if(DATA_REC[1]==0xFD)//拍照
                 {
                     capStatus = cap->read();
@@ -427,21 +441,24 @@ int MainWindow::generate_temp()
                         frame = cap->frame;
                         DATA_MSG[02]=03;
                         if(sendnTTY(ptty,DATA_MSG,5)==5){ //完成
-                            cout<<"模板图："<<cur_no<<endl;
+                            if(DEBUG)
+                                cout<<"模板图："<<cur_no<<endl;
                             imwrite((ORG_PATH+to_string(cur_no++)+".jpg").c_str(),frame);//图片保存到本工程目录中
                         }else
-                            cout<<"send code error";
+                            writeLog("send code error:串口发送失败");
                     }
                 }
                 else if (DATA_REC[1] == 0xFB) {init_param(btn_r);}//进入相机校正模式
                 else if(DATA_REC[1]==0xFE && cur_no<holes)  //退出模板
                 {
                     cerr<<"模板生成失败,退出模板"<<endl;
+                    writeLog("模板生成失败,退出模板");
                     return -1;
                 }
-                else if(DATA_REC[1]==0xFA)
+                else if(DATA_REC[1]==0xFA) //进入识别模式
                 {
                     cerr<<"模板生成失败"<<endl;
+                    writeLog("模板生成失败,进入识别模式");
                     return 2;
                 }
                 memset(DATA_REC,0,8);
@@ -465,7 +482,9 @@ int MainWindow::generate_temp()
             imwrite((RECT_PATH+to_string(index)+".jpg").c_str(), blurModelDstMat);
         }
         else{
-            cout << "模板图像不足！" << endl;
+            if(DEBUG)
+                cout << "模板图像不足！" << endl;
+            writeLog("模板图像不足");
             break;
         }
     }
@@ -476,7 +495,8 @@ int MainWindow::generate_temp()
     {
         Mat src = (*it).clone();
         sprintf(filename, (MODEL_PATH+"/"+to_string(vect_index)+".jpg").c_str());
-        cout<<filename<<endl;
+        if(DEBUG)
+            cout<<filename<<endl;
         if(GAUSS_DIFF)
             src=gauss_diff(src);//高反差
         if(LAPLACE)
@@ -488,7 +508,8 @@ int MainWindow::generate_temp()
         imwrite(filename, src);
         vect_index = vect_index + 1;
     }
-    cout <<"模板生成成功！" << endl;
+    if(DEBUG)
+        cout <<"模板生成成功！" << endl;
     return 0;
 }
 
@@ -497,7 +518,8 @@ int MainWindow::match()
 {
     fcntl(ptty->fd, F_SETFL, FNDELAY);//非阻塞
 
-    cout<<"进入方向识别程序……"<<endl;
+    if(DEBUG)
+        cout<<"进入方向识别程序……"<<endl;
     int holes=HOLES,position=POSITION;
     Mat frame;
     int nbyte=0;
@@ -512,10 +534,12 @@ int MainWindow::match()
     }catch ( exception &e){
         cerr << "Caught: " << e.what( ) << endl;
         cerr << "Type: " << typeid( e ).name( ) << endl << endl;
+        writeLog(e.what());
     }
     if (!fileinput.is_open())
     {
         cerr<<"模板不存在或打开模板文件失败！"<<endl;
+        writeLog("模板不存在或打开模板文件失败！");
         return 0;
     }
 
@@ -558,7 +582,7 @@ int MainWindow::match()
         if (!matchImage.empty()){
             modelMats.push_back(matchImage);
         }
-        else{ cerr<<"模板图像不足！" << endl;return 0; }
+        else{ cerr<<"模板图像不足！" << endl;writeLog("模板图像不足！");return 0; }
     }
 
     Mat blurMatchDstMat,dstMatchRect1,dstMatchRect2;
@@ -582,22 +606,31 @@ int MainWindow::match()
         capStatus=cap->read();
         direction=1;
         if(!capStatus){
-            sendCapLoseMsg();
+            if(STATUS_SHOW != "相机掉线"){
+                sendCapLoseMsg();
+            }
         }
         else{
+            if(STATUS_SHOW == "相机掉线"){
+                STATUS_SHOW = "正常";
+                updateStatus();//更新状态
+            }
             img=cap->frame;
             showImg(img);
             memset(DATA_REC,0,8);  //清空
+	        start = clock();
             nbyte = recvnTTY(ptty,DATA_REC,5);
 
             if(nbyte==5){//设置参数
                 setParams();
             }
             else if(nbyte==4) {
-                printData(DATA_REC, 4);
+                if(DEBUG){
+                    cout<<++ii<<endl;
+                    printData(DATA_REC, 4);
+                }
                 if (DATA_REC[1] == 0xFD)//拍照
                 {
-                    start = clock();
                     if (!cap->read()) {
                         sendCapLoseMsg();
                     } else {
@@ -638,24 +671,30 @@ int MainWindow::match()
                             DATA_ANGLE[2] = direction;
                             DATA_ANGLE[3] = SYMMERY ? (angle + 180) % 180 : angle;
                             sendnTTY(ptty, DATA_ANGLE, 6);
-                            printData(DATA_ANGLE, 6);
+                            if(DEBUG)
+                                printData(DATA_ANGLE, 6);
                         } else {//01图像无法使别
                             STATUS_SHOW = "无法识别";
                             ANGLE_SHOW = "ERROR";
                             DATA_MSG[2] = 01;
                             sendnTTY(ptty, DATA_MSG, 5);
-                            printData(DATA_MSG, 5);
+                            if(DEBUG)
+                                printData(DATA_MSG, 5);
                         }
                         finish = clock();
-                        total_time = (double) ((finish - start) * 1000 / CLOCKS_PER_SEC);//ms
-                        printf("识别时间 = %gms\n", total_time);//毫秒
-
+                        if(DEBUG){
+                            total_time = (double) ((finish - start) * 1000 / CLOCKS_PER_SEC);//ms
+                            printf("识别时间 = %gms\n", total_time);//毫秒
+                        }
                         updateAngle();
                         updateStatus();//更新状态
-                        imwrite(("../识别照片/" + to_string(ii++) + ".jpg").c_str(), frame);
-                        max >= 0.4 && max < 1.0 ? (direction == 0 ? printf("旋转角度 = %d ,方向 左\n", DATA_ANGLE[3]) : printf(
-                                "旋转角度 = %d ,方向 右\n", DATA_ANGLE[3])) : printf("无法识别\n");
-                        cout << endl;
+//                        imwrite(("./识别照片/" + to_string(ii++) + ".jpg").c_str(), frame);
+                        if(DEBUG){
+                            max >= 0.4 && max < 1.0 ? (direction == 0 ? printf("旋转角度 = %d ,方向 左\n", DATA_ANGLE[3]) : printf(
+                                    "旋转角度 = %d ,方向 右\n", DATA_ANGLE[3])) : printf("无法识别\n");
+                            cout << endl;
+//                        writeLog(STATUS_SHOW.c_str());
+                        }
                     }
                 }
                 else if (DATA_REC[1] == 0xFE) {return -1;} //退出识别
@@ -663,9 +702,15 @@ int MainWindow::match()
                 else if (DATA_REC[1] == 0xFB) {return 0;}//进入相机校正模式
             }
             else if(nbyte>0){
-                printData(DATA_REC,4);
-                cout<<endl;
-                cerr<<"异常指令"<<endl;
+                if(DEBUG){
+                    printData(DATA_REC,4);
+                    cout<<endl;
+                }
+                STATUS_SHOW = "异常指令";
+                updateStatus();//更新状态
+                if(DEBUG)
+                    cerr<<"异常指令"<<endl;
+                writeLog("异常指令[match()]");
             }
         }
         usleep(5000);//us
@@ -706,7 +751,7 @@ void MainWindow::init_param(double r)
         src = cap->frame;
         showImg(src);
         if( !src.data )
-        { cout<<"未读取到摄像头图像!"<<endl;return ; }
+        { cout<<"未读取到摄像头图像!"<<endl;writeLog("未读取到摄像头图像");return ; }
 
         cvtColor( src, src_gray, CV_BGR2GRAY );
         GaussianBlur( src_gray, src_gray, Size(9, 9), 2, 2 );
@@ -728,6 +773,7 @@ void MainWindow::init_param(double r)
     sleep(2);
     if(circles.size()>1){
         cerr<<"校正失败"<<endl;
+        writeLog("校正失败");
         return ;
     }
     Point center = Point((int)circles[0][0],(int)circles[0][1]); //纽扣中心
@@ -744,6 +790,7 @@ void MainWindow::init_param(double r)
     }catch (exception &e){
         cerr<<e.what()<<endl;
         cerr<<"初始化文件打开失败!"<<endl;
+        writeLog("initParams():初始化文件打开失败");
         return;
     }
     file << "center:"<<center.x<<","<<center.y<<endl;
@@ -798,8 +845,8 @@ void MainWindow::printData(unsigned char *arr,int size)
 //显示图像
 void MainWindow::showImg(Mat img)
 {
-    line(img,start1,end1,(255,0,0));
-    line(img,start2,end2,(255,0,0));
+    line(img,start1,end1,Scalar(45, 35, 255),2);
+    line(img,start2,end2,Scalar(45, 35, 255),2);
     Qimage = mat2QImage(img).transformed(matrix,Qt::FastTransformation);
     label_frame->setPixmap(QPixmap::fromImage(Qimage));
     label_frame->show();
@@ -834,15 +881,18 @@ inline int MainWindow::initPtty()
     ptty = readyTTY(0);
     if(ptty == NULL) {
         printf("readyTTY(0) error\n");
+        writeLog("readyTTY(0) error");
         return -1;
     }
     lockTTY(ptty);
     if(setTTYSpeed(ptty,9600)>0){  //设置波特率
         printf("setTTYSpeed() error\n");
+        writeLog("setTTYSpeed(0) error");
         return -1;
     }
     if(setTTYParity(ptty,8,'N',1)>0){ //设置通讯格式
         printf("setTTYParity() error\n");
+        writeLog("setTTYParity(0) error");
         return -1;
     }
     fcntl(ptty->fd, F_SETFL, FNDELAY);//非阻塞
@@ -856,12 +906,15 @@ void MainWindow::sendCapLoseMsg()
     updateStatus();//更新状态
     DATA_MSG[2]=02;
     sendnTTY(ptty,DATA_MSG,5);
+    if(DEBUG)
+        printData(DATA_MSG,5);
 }
 
 //响应设置参数指令
 void MainWindow::setParams()
 {
-    printData(DATA_REC,5);
+    if(DEBUG)
+        printData(DATA_REC,5);
     switch (DATA_REC[1]){
         case 0xF4:{EXPOSURE=DATA_REC[2]*10;cap->setExposure(DATA_REC[2]*10);cout<<"曝光："<<DATA_REC[2]*10<<endl;break;} //曝光
         case 0xF5:{GAIN=DATA_REC[2];cap->setGain(DATA_REC[2]);cout<<"增益："<<(int)DATA_REC[2]<<endl;break;}  //增益

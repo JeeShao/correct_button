@@ -9,12 +9,14 @@ int GAIN = 255;
 string ANGLE_SHOW = "";
 string STATUS_SHOW = "正常";
 
-const string FILE_PATH = "../20180706/";
+const string FILE_PATH = "20180706/";
 const string MODEL_PATH = FILE_PATH+"model/";
 const string ORG_PATH = FILE_PATH+"org_imgs/";
 const string RECT_PATH = FILE_PATH+"org_rects/"; //模板图矩形框
 const string PARAMS_PATH = FILE_PATH+"params.txt"; //参数文件
 const string INIT_FILE = FILE_PATH+"init.txt";
+const string LOG_FILE = FILE_PATH+"log.txt";
+const string LOGO_FILE = FILE_PATH+"logo.jpg";
 /*************************************
 Function:    remove_files()
 Description: 删除目录下所有文件
@@ -85,8 +87,6 @@ Mat pertImage(Mat srcImage){
     Mat blurImage;
     if(srcImage.channels()==3) {
         srcImage = whiteBalance(srcImage);
-//	unevenLightCompensate(srcImage,12);
-
         cvtColor(srcImage, grayImage, CV_BGR2GRAY);
     } else
         grayImage = srcImage.clone();
@@ -97,11 +97,11 @@ Mat pertImage(Mat srcImage){
 
 //	equalizeHist(grayImage,grayImage);
 
-    const int maxVal = 255;
-    int blockSize = 3;	//取值3、5、7....等
-    int constValue = 5;
-    int adaptiveMethod = 0;
-    int thresholdType = 1;
+//    const int maxVal = 255;
+//    int blockSize = 3;	//取值3、5、7....等
+//    int constValue = 5;
+//    int adaptiveMethod = 0;
+//    int thresholdType = 1;
     /*
         自适应阈值算法
         0:ADAPTIVE_THRESH_MEAN_C
@@ -113,8 +113,6 @@ Mat pertImage(Mat srcImage){
     */
     //---------------【4】图像自适应阈值操作-------------------------
 //    adaptiveThreshold(grayImage, grayImage, maxVal, adaptiveMethod, thresholdType, blockSize, constValue);
-
-
 
     GaussianBlur(grayImage, blurImage, Size(3, 3), 0, 0);
     return blurImage;
@@ -252,12 +250,35 @@ string get_time( ) {
 }
 
 bool init_sys(){
-    string end = "201905282023";
+    string end = "201906282023";
     string now = get_time();
     if(now>end)
         return 1;
     else
         return 0;
+}
+
+void writeLog(const char* logStr) {
+    string datetime;
+    time_t now = time(0);
+    tm *ltm = localtime(&now);
+
+    string mon = (1+ltm->tm_mon) <10? '0'+to_string(1+ltm->tm_mon):to_string(1+ltm->tm_mon);
+    string day = ltm->tm_mday <10? '0'+to_string(ltm->tm_mday):to_string(ltm->tm_mday);
+    string hour = ltm->tm_hour <10? '0'+to_string(ltm->tm_hour):to_string(ltm->tm_hour);
+    string min = ltm->tm_min <10? '0'+to_string(ltm->tm_min):to_string(ltm->tm_min);
+    string second = ltm->tm_sec<10? '0'+to_string(ltm->tm_sec):to_string(ltm->tm_sec);
+    datetime = to_string(1900+ltm->tm_year) +'/'+ mon+'/'+ day+' ' + hour +':' +min+':'+second;
+    ofstream logFile;
+    logFile.open(LOG_FILE,ios::out|ios::in|ios::app);
+    logFile<<'['<<datetime<<"]:"<<logStr<<endl;
+    logFile.flush();
+    logFile.seekp(0,logFile.end);
+    if(logFile.tellp()>100*1024){//内存达到100M清空
+        remove(LOG_FILE.c_str());
+        cout<<"删除log文件"<<endl;
+    }
+    logFile.close();
 }
 
 void save_params(){

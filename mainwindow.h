@@ -11,6 +11,7 @@
 #include <QGraphicsProxyWidget>
 #include <QThread>
 #include <QString>
+#include <QDesktopWidget>
 #include "Mylabel.h"
 #include <math.h>
 #include <pthread.h>
@@ -18,7 +19,7 @@
 #include "JHCap.h"
 #include "common.h"
 //#include "camera.h"
-#include "capture.h"
+#include "camera.h"
 
 
 //驱动相机
@@ -59,7 +60,7 @@ public:
     void showImg(Mat img);
 
 private:
-    Capture *cap;
+    Camera *cap;
     TTY_INFO *ptty;  //串口
     int width=1280/*376*/;
     int height=1024/*240*/;
