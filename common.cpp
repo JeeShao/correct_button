@@ -9,7 +9,7 @@ int GAIN = 255;
 string ANGLE_SHOW = "";
 string STATUS_SHOW = "正常";
 
-const string FILE_PATH = "20180706/";
+const string FILE_PATH = "../20180706/";
 const string MODEL_PATH = FILE_PATH+"model/";
 const string ORG_PATH = FILE_PATH+"org_imgs/";
 const string RECT_PATH = FILE_PATH+"org_rects/"; //模板图矩形框
@@ -250,12 +250,144 @@ string get_time( ) {
 }
 
 bool init_sys(){
-    string end = "201906282023";
+    string end = "201906302023";
     string now = get_time();
     if(now>end)
         return 1;
     else
         return 0;
+}
+
+void getDate(char *dateNow) {
+    string datetime;
+    time_t now = time(0);
+    tm *ltm = localtime(&now);
+
+    string mon = (1+ltm->tm_mon) <10? '0'+to_string(1+ltm->tm_mon):to_string(1+ltm->tm_mon);
+    string day = ltm->tm_mday <10? '0'+to_string(ltm->tm_mday):to_string(ltm->tm_mday);
+
+    datetime = to_string(1900+ltm->tm_year) + mon+ day;
+    sprintf(dateNow,"%s", (char*)datetime.c_str());
+}
+
+static int getdiskid(char *hardc) {
+    int fd;
+    char serialNo[8];//8位
+    struct hd_driveid hid;
+    fd = open ("/dev/sda", O_RDONLY);
+    if (fd < 0)
+    {
+        return -1;
+    }
+    if (ioctl (fd, HDIO_GET_IDENTITY, &hid) < 0)
+    {
+        return -1;
+    }
+
+    close(fd);
+    for(int i=12;i<20;i++){
+        serialNo[i-12] = hid.serial_no[i]<71? hid.serial_no[i]:(hid.serial_no[i]%10+48);
+    }
+//    for(int i=0;i<8;i++){
+//      serialNo[i] = hid.serial_no[i]<71? hid.serial_no[i]:(hid.serial_no[i]%10+48);
+//    }
+    // serialNo = string((char*)hid.serial_no).substr(12,8).c_str();
+    sprintf(hardc,"%s", serialNo);
+    //printf("当前序列号：%s\n",serialNo);
+    return 0;
+}
+
+int char2int(char input) {
+    return input>64?(input-55):(input-48);
+}
+
+int int2char(char input) {
+    return input>9?(input+55):(input+48);
+}
+
+void hexStrXor(char * HexStr1, char * HexStr2, char * HexStr ) {
+    int i, iHexStr1Len, iHexStr2Len, iHexStrLenLow, iHexStrLenGap;
+    //转换成大写并求长度
+    iHexStr1Len = strlen( HexStr1 );
+    iHexStr2Len = strlen( HexStr2 );
+    //获取最小的长度
+    iHexStrLenLow = iHexStr1Len<iHexStr2Len?iHexStr1Len:iHexStr2Len;
+    //获取长度差值
+    iHexStrLenGap = abs( iHexStr1Len-iHexStr2Len );
+    //两个十六进制的字符串进行异或
+    for( i=0; i<iHexStrLenLow; i++ )
+    {
+        *(HexStr+i) = char2int( HexStr1[i] ) ^ char2int( HexStr2[i] );
+        *(HexStr+i) = int2char( *(HexStr+i) );
+    }
+    if( iHexStr1Len>iHexStr2Len )
+        memcpy( HexStr+i, HexStr1+i, iHexStrLenGap );
+    else if( iHexStr1Len<iHexStr2Len )
+        memcpy( HexStr+i, HexStr2+i, iHexStrLenGap );
+    *( HexStr+iHexStrLenLow+iHexStrLenGap ) = 0x00;
+}
+
+bool systemCheck(){
+    char nowDate[8];
+    char hardseri[8];
+    char xorLastRes[8];
+    char xorEndRes[8];
+    char lastDate[8];
+    char endDate[8];
+    fstream fileinput;
+    try {
+        fileinput.open("/bin/.sysdisk.dat");
+    }catch ( exception &e){
+        cerr << "Caught: " << e.what( ) << endl;
+        cerr << "Type: " << typeid( e ).name( ) << endl << endl;
+    }
+    if (!fileinput.is_open())
+    {
+        cout<<"打开文件失败！"<<endl;
+        return false;
+    }
+
+    string data[2];
+    for(int i=0;i<2;i++){
+        fileinput>>data[i];
+    }
+    fileinput.close();
+
+    sprintf(xorLastRes,"%s",exchange(data[0], "=")[1].c_str());
+    sprintf(xorEndRes,"%s",exchange(data[1], "=")[1].c_str());
+    getDate(nowDate);
+    if(getdiskid(hardseri)==-1)//失败
+    {
+        cout<<"序列号获取失败"<<endl;
+        return false;
+    }
+    hexStrXor(xorLastRes,hardseri,lastDate);
+    hexStrXor(xorEndRes,hardseri,endDate);
+//    printf("最近一次:%s\n",lastDate);
+//    printf("截止时间:%s\n",endDate);
+//    printf("当前时间:%s\n",nowDate);
+//    cout<<"strcmp(dateNow,lastTime)="<<strcmp(nowDate,lastDate)<<endl;
+//    cout<<"strcmp(dateNow,endTime)="<<strcmp(nowDate,endDate)<<endl;
+    if(strcmp(nowDate,lastDate)<0 || strcmp(nowDate,endDate)>0){
+        remove("/bin/.sysdisk.dat");
+        return false;
+    }
+    try {
+        fileinput.open("/bin/.sysdisk.dat");
+    }catch ( exception &e){
+        cerr << "Caught: " << e.what( ) << endl;
+        cerr << "Type: " << typeid( e ).name( ) << endl << endl;
+    }
+    if (!fileinput.is_open())
+    {
+        //cerr<<"打开文件失败！"<<endl;
+        return false;
+    }
+    hexStrXor(nowDate,hardseri,xorLastRes);//更新
+    fileinput << "lastserial="<<xorLastRes<<endl;
+    fileinput << "endserial="<<xorEndRes<<endl;
+    //cout<<"写入成功"<<endl;
+    return true;
 }
 
 void writeLog(const char* logStr) {
@@ -328,6 +460,5 @@ void read_params(){
     EXPOSURE = atoi((exchange(data[4], ":")[1]).c_str());
     GAIN = atoi((exchange(data[5], ":")[1]).c_str());
     fileinput.close();
-
 }
 

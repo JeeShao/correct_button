@@ -13,7 +13,7 @@ Camera::~Camera() {}
 bool Camera::init(int exporsure,int gain){
     int count=0;
     CameraGetCount(&count);
-    printf("Camera count: %d\n", count);
+//    printf("Camera count: %d\n", count);
     if(count<1)
         return false;
     CameraInit(0);
@@ -36,8 +36,7 @@ void Camera::close() {
 }
 
 int Camera::read() {
-    if (CameraQueryImage(0, (unsigned char *) image->imageData, &len,
-                         CAMERA_IMAGE_BMP/* |CAMERA_IMAGE_TRIG*/) == API_OK) {
+    if (CameraQueryImage(0, (unsigned char *) image->imageData, &len,CAMERA_IMAGE_BMP) == API_OK) {
         frame = cvarrToMat(image);
         return true;
     }

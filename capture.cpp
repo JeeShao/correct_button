@@ -1,7 +1,3 @@
-//
-// Created by app on 19-1-16.
-//
-
 #include "capture.h"
 
 Capture::Capture(int device=0):device(device){

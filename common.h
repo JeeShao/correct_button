@@ -1,4 +1,3 @@
-
 #ifndef PROGRAM_1202_COMMON_H
 #define PROGRAM_1202_COMMON_H
 
@@ -17,6 +16,11 @@
 #include<string>
 #include<typeinfo>
 #include<map>
+#include<linux/hdreg.h>
+#include<sys/ioctl.h>
+#include<fcntl.h>
+#include<unistd.h>
+#include<string.h>
 using namespace std;
 using namespace cv;
 
@@ -28,7 +32,7 @@ using namespace cv;
 #define RECT_PRECENT  3.0/4  //矩形占比2/3
 #define X_MARGIN  100  //圆心和4个铁钉构成的矩形的左右边距
 #define Y_MARGIN  90  //圆心和4个铁钉构成的矩形的左右边距
-#define DEBUG 0 //调试log打印
+#define DEBUG 1 //调试log打印
 
 extern const string FILE_PATH;
 extern const string MODEL_PATH;
@@ -89,5 +93,15 @@ void writeLog(const char* logStr);
 void save_params();
 
 void read_params();
+
+void getDate(char *dateNow);
+
+int char2int(char input);
+
+int int2char(char input);
+
+void hexStrXor(char * HexStr1, char * HexStr2, char * HexStr);
+
+bool systemCheck();
 
 #endif

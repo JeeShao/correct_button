@@ -1,10 +1,6 @@
-#ifndef MAINWINDOW_H
-#define MAINWINDOW_H
-
 #include <QtCore>
 #include <QMainWindow>
 #include <QLabel>
-#include <QMenuBar>
 #include <QApplication>
 #include <QGuiApplication>
 #include <QGraphicsView>
@@ -12,75 +8,65 @@
 #include <QThread>
 #include <QString>
 #include <QDesktopWidget>
-#include "Mylabel.h"
-#include <math.h>
-#include <pthread.h>
-#include "serial.h"
-#include "JHCap.h"
-#include "common.h"
-//#include "camera.h"
-#include "camera.h"
+#include <QTimer>
+#include <string>
+#include <iostream>
+#include <unistd.h>
+#include "mythread.h"
 
+using namespace std;
 
-//驱动相机
-//Camera capture(width,height);
-
-class MainWindow : public QMainWindow,public QThread
+class MainWindow : public QMainWindow
 {
-//Q_OBJECT
+    Q_OBJECT//信号与槽
 
+public:
+    MainWindow(QWidget *parent = 0);
+    ~MainWindow();
+
+    void setupUi(QMainWindow *MainWindow);
+    void retranslateUi(QMainWindow *MainWindow);
+    QImage mat2QImage(Mat cvImg); //Mat转QImage
 public:
     int screen_w;//屏幕宽
     int screen_h;//屏幕高
     QWidget *centralwidget;
     QLabel *label_title;
-    Mylabel *label_frame;
+    QLabel *label_frame;
     QLabel *label_angle;
     QLabel *label_angle_val;
     QLabel *label_status;
     QLabel *label_status_val;
     QLabel *label_logo;
     QFont font1;
-    static MainWindow* mainwindow;
 
-    static unsigned char DATA_MSG[5];//通知
-    static unsigned char DATA_ANGLE[6];//旋转角度
-    static unsigned char DATA_REC[8];//接受串口信息
 
-public:
-    MainWindow(QWidget *parent = 0);
-    ~MainWindow();
-    void setupUi(QMainWindow *MainWindow);
-    void retranslateUi(QMainWindow *MainWindow);
-    QImage mat2QImage(Mat mat);
-    int generate_temp();
-    int match();
-    void run();
-    int startFun();
-    void showImg(Mat img);
+public slots:
+    void show_frame();
+    void dealTakePhoto();
+    void setStatus(string status);
+    void setAngle(string angle);
+    void setExposure(int val);
+    void setGain(int val);
+    void setShowInitImg(Mat img);
+
+signals:
+    void cameraLoss();
+
 
 private:
-    Camera *cap;
-    TTY_INFO *ptty;  //串口
-    int width=1280/*376*/;
-    int height=1024/*240*/;
-    int len=0;
-    QImage Qimage;//旋转
+    Capture *cap;
+    QTimer *timer1;
+    Mat image;
+    MyThread *mythread;
+    int img_no;
+    int width=1280;
+    int height=1024;
     QMatrix matrix;
-    //中心线
-    Point start1;
+    Point start1;//中心线
     Point end1 ;
     Point start2;
     Point end2;
-
-private:
-    void printData(unsigned char *arr,int size);
-    void init_param(double r);
-    void updateStatus();
-    void updateAngle();
-    inline int initPtty();
-    void sendCapLoseMsg();
-    void setParams();
 };
 
-#endif
+
