@@ -55,7 +55,10 @@ signals:
 
 
 private:
-    Capture *cap;
+    //××××××××××更改相机驱动××××××××
+    //Capture *cap;
+    Camera *cap;
+    //××××××××××**********××××××××
     QTimer *timer1;
     Mat image;
     MyThread *mythread;
@@ -67,6 +70,8 @@ private:
     Point end1 ;
     Point start2;
     Point end2;
+
+    bool CapInit;
 };
 
 

@@ -3,6 +3,7 @@
 MainWindow::MainWindow(QWidget *parent)
         : QMainWindow(parent),img_no(0)
 {
+    CapInit = false;
     //屏幕分辨率
     screen_w=768;
     screen_h=1024;
@@ -15,9 +16,10 @@ MainWindow::MainWindow(QWidget *parent)
     matrix.rotate(90.0);
 
     mythread = new MyThread(this);
-    cap = new Capture(200);
-    cap->open();
+    //××××××××××更改相机驱动××××××××
     //cap = new Capture(200);cap->open();
+    cap = new Camera(1280,1024);
+    //××××××××××××××××××××××××××××
     this->setupUi(this);
 }
 
@@ -110,12 +112,13 @@ void MainWindow::setupUi(QMainWindow *MainWindow)
     MainWindow->setCentralWidget(centralwidget);
     retranslateUi(MainWindow);
 
-
-    while(!cap->init(EXPOSURE,GAIN)){ //启动时未插上相机
+    sleep(2);//等待相机就位
+    if(!cap->init(EXPOSURE,GAIN)){ //启动时未插上相机
         label_frame->setText("连接相机失败");
         usleep(10);
-    }
-    sleep(2);//等待相机就位
+    } else
+        CapInit = true;
+
     timer1 = new QTimer(this);
     connect(timer1,SIGNAL(timeout()),this,SLOT(show_frame()));
     connect(mythread,&MyThread::takePhoto_signal,this,&MainWindow::dealTakePhoto);
@@ -127,8 +130,6 @@ void MainWindow::setupUi(QMainWindow *MainWindow)
     connect(mythread,SIGNAL(showInitImg(Mat)),this,SLOT(setShowInitImg(Mat)));
     timer1->start(20);//20ms
     mythread->start();
-
-
 }
 
 //设置控件内容
@@ -147,17 +148,27 @@ void MainWindow::retranslateUi(QMainWindow *MainWindow)
 //slots 显示图像
 void MainWindow::show_frame()
 {
-    if(cap->read())
-    {
-        image=cap->frame;
-        line(image,start1,end1,Scalar(45, 35, 255),2);
-        line(image,start2,end2,Scalar(45, 35, 255),2);
-        label_frame->setPixmap(QPixmap::fromImage(mat2QImage(image).transformed(matrix,Qt::FastTransformation)));
-    }else{
-        if(DEBUG)
-            cout<<"掉线拉...."<<endl;
-        emit cameraLoss();
-        label_frame->setText("相机未连接");
+    if(CapInit){
+        if(cap->read())
+        {
+            image=cap->frame;
+            line(image,start1,end1,Scalar(45, 35, 255),2);
+            line(image,start2,end2,Scalar(45, 35, 255),2);
+            label_frame->setPixmap(QPixmap::fromImage(mat2QImage(image).transformed(matrix,Qt::FastTransformation)));
+        }else{
+            if(DEBUG)
+                cout<<"掉线拉...."<<endl;
+            emit cameraLoss();
+            label_frame->setText("相机未连接");
+        }
+    }
+    else{
+        if(!cap->init(EXPOSURE,GAIN)){ //启动时未插上相机
+            label_frame->setText("连接相机失败");
+//            emit cameraLoss();
+            usleep(10);
+        } else
+            CapInit = true;
     }
 }
 
