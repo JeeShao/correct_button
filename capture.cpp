@@ -44,6 +44,7 @@ Mat Capture::getNextFrame(){
 
 bool Capture::init(int exporsure,int gain){
     return exporsure+gain;
+//    return 0;
 }
 void Capture::setExposure(int value){
 }

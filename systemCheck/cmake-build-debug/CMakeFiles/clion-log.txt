@@ -1,0 +1,1 @@
+Cannot save file /home/app/CLionProjects/systemCheck/CMakeFiles/clion-environment.txt

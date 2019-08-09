@@ -9,7 +9,7 @@ int GAIN = 255;
 string ANGLE_SHOW = "";
 string STATUS_SHOW = "正常";
 
-const string FILE_PATH = "../20180706/";
+const string FILE_PATH = "20180706/";
 const string MODEL_PATH = FILE_PATH+"model/";
 const string ORG_PATH = FILE_PATH+"org_imgs/";
 const string RECT_PATH = FILE_PATH+"org_rects/"; //模板图矩形框
@@ -250,7 +250,7 @@ string get_time( ) {
 }
 
 bool init_sys(){
-    string end = "201906302023";
+    string end = "201907302023";
     string now = get_time();
     if(now>end)
         return 1;

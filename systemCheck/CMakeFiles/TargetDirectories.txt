@@ -1,0 +1,3 @@
+/home/app/CLionProjects/systemCheck/CMakeFiles/edit_cache.dir
+/home/app/CLionProjects/systemCheck/CMakeFiles/rebuild_cache.dir
+/home/app/CLionProjects/systemCheck/CMakeFiles/systemCheck.dir

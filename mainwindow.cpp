@@ -112,23 +112,25 @@ void MainWindow::setupUi(QMainWindow *MainWindow)
     MainWindow->setCentralWidget(centralwidget);
     retranslateUi(MainWindow);
 
-    sleep(2);//等待相机就位
+
+    read_params();//读取曝光和增益参数
     if(!cap->init(EXPOSURE,GAIN)){ //启动时未插上相机
         label_frame->setText("连接相机失败");
         usleep(10);
     } else
         CapInit = true;
-
+    sleep(2);//等待相机就位
     timer1 = new QTimer(this);
     connect(timer1,SIGNAL(timeout()),this,SLOT(show_frame()));
-    connect(mythread,&MyThread::takePhoto_signal,this,&MainWindow::dealTakePhoto);
+    connect(mythread,&MyThread::takePhoto_signal,this,&MainWindow::dealTakePhoto,Qt::DirectConnection);
     connect(mythread,SIGNAL(updateStatus(string)),this,SLOT(setStatus(string)));
     connect(mythread,SIGNAL(updateAngle(string)),this,SLOT(setAngle(string)));
     connect(mythread,SIGNAL(updateExposure(int)),this,SLOT(setExposure(int)));
     connect(mythread,SIGNAL(updateGain(int)),this,SLOT(setGain(int)));
     connect(this,SIGNAL(cameraLoss()),mythread,SLOT(lossCamera()));
+    connect(mythread,SIGNAL(cameraLoss()),mythread,SLOT(lossCamera()));
     connect(mythread,SIGNAL(showInitImg(Mat)),this,SLOT(setShowInitImg(Mat)));
-    timer1->start(20);//20ms
+    timer1->start(30);//30ms
     mythread->start();
 }
 
@@ -158,14 +160,17 @@ void MainWindow::show_frame()
         }else{
             if(DEBUG)
                 cout<<"掉线拉...."<<endl;
-            emit cameraLoss();
-            label_frame->setText("相机未连接");
+//            emit mythread->updateStatus("掉线00");
+            emit mythread->cameraLoss();
+//            label_frame->setText("相机掉线");
         }
     }
     else{
         if(!cap->init(EXPOSURE,GAIN)){ //启动时未插上相机
             label_frame->setText("连接相机失败");
-//            emit cameraLoss();
+//            emit mythread->updateStatus("掉线11");
+            emit mythread->cameraLoss();
+//            emit this->cameraLoss();
             usleep(10);
         } else
             CapInit = true;
@@ -176,8 +181,7 @@ void MainWindow::show_frame()
 void MainWindow::dealTakePhoto()
 {
 //    qDebug()<<"拍照";
-
-    if(cap->read())
+    if(1)
     {
         mutex.lock();
         FINISH_TAKE_PHOTO = 1;
@@ -238,6 +242,7 @@ void MainWindow::setShowInitImg(Mat img)
     QPixmap pixmap= QPixmap::fromImage(mat2QImage(img).transformed(matrix,Qt::FastTransformation));
     label_frame->setPixmap(pixmap);
     label_frame->repaint();//立即重绘  update()是加入到时间列表
+    QCoreApplication::processEvents();
     QThread::sleep(2);
 }
 

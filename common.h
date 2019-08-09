@@ -29,10 +29,11 @@ using namespace cv;
 #define LAPLACE 0//拉普拉斯增强
 #define BLUR 1 //模糊
 #define THRESH 1 //自适应
-#define RECT_PRECENT  3.0/4  //矩形占比2/3
-#define X_MARGIN  100  //圆心和4个铁钉构成的矩形的左右边距
-#define Y_MARGIN  90  //圆心和4个铁钉构成的矩形的左右边距
-#define DEBUG 1 //调试log打印
+#define RECT_PRECENT  3.15/4 // 3.0/4  //矩形占比2/3
+#define X_MARGIN  90  //   100  //圆心和4个铁钉构成的矩形的左右边距
+#define Y_MARGIN  90  //   90  //圆心和4个铁钉构成的矩形的上下边距
+#define DEBUG 0 //调试log打印
+//#define CAMERA 1 // 1--驱动相机  0--USB相机
 
 extern const string FILE_PATH;
 extern const string MODEL_PATH;

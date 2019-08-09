@@ -31,6 +31,7 @@ void MyThread::run()
     read_params();
     //保存参数
     save_params();
+
     //初始化系统
     if(init_sys())
         return;
@@ -43,7 +44,6 @@ void MyThread::run()
         }
         msleep(10);//10ms
     }
-
     match_pattern = match();//默认进入识别模式
     if (match_pattern==1)
     {generate_pattern=generate_temp();match_pattern=-1;}
@@ -488,10 +488,11 @@ int MyThread::match()
             }
             if (DATA_REC[1] == 0xFD)//拍照
             {
-                if (!takePhoto() && STATUS_SHOW!="相机掉线") {
-                    sendCapLoseMsg();
+                if (!takePhoto()) {
+                    if(STATUS_SHOW!="相机掉线")
+                        sendCapLoseMsg();
                 } else {
-                    if(STATUS_SHOW == "相机掉线"){
+                    if(STATUS_SHOW != "正常"){
                         STATUS_SHOW = "正常";
                         emit updateStatus(STATUS_SHOW);//更新状态
                     }
@@ -576,20 +577,21 @@ int MyThread::match()
         else if(nbyte==5){//设置参数
             setParams();
         }
-        else if(nbyte>0){
-            if(DEBUG){
-                printData(DATA_REC,4);
-                cout<<endl;
-            }
-            if(STATUS_SHOW != "异常指令")
-            {
-                STATUS_SHOW = "异常指令";
-                emit updateStatus(STATUS_SHOW);//更新状态
-            }
-            if(DEBUG)
-                cerr<<"异常指令"<<endl;
-            writeLog("异常指令[match()]");
-        } else
+//        else if(nbyte>0){
+//            if(DEBUG){
+//                printData(DATA_REC,4);
+//                cout<<endl;
+//            }
+//            if(STATUS_SHOW != "异常指令")
+//            {
+//                STATUS_SHOW = "异常指令";
+//                emit updateStatus(STATUS_SHOW);//更新状态
+//            }
+//            if(DEBUG)
+//                cerr<<"异常指令"<<endl;
+//            writeLog("异常指令[match()]");
+//        }
+        else
             msleep(10); //限制刷新
     }
 }
@@ -597,6 +599,8 @@ int MyThread::match()
 //拍照
 bool MyThread::takePhoto()
 {
+    clock_t start,finish;
+    start = clock();
     emit takePhoto_signal();
     mutex.lock();
     while(FINISH_TAKE_PHOTO== 0)
@@ -609,6 +613,8 @@ bool MyThread::takePhoto()
     {
 //        qDebug()<<"拍照完成";
         FINISH_TAKE_PHOTO= 0;
+        finish = clock();
+        cout<<"take "<<(double) ((finish - start) * 1000 / CLOCKS_PER_SEC)<<"ms"<<endl;//ms
         return true;
     }
     else{

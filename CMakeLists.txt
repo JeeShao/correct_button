@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.7)
+cmake_minimum_required(VERSION 3.5)
 project(program)
 
 set(CMAKE_AUTOMOC on)
@@ -11,7 +11,7 @@ find_package(Threads REQUIRED)
 include_directories(${OpenCV_INCLUDE_DIRS})
 set(CMAKE_CXX_STANDARD 11)
 
-set(SOURCE_FILES main.cpp mainwindow.cpp mainwindow.h capture.h capture.cpp mythread.cpp mythread.h
+set(SOURCE_FILES main.cpp mainwindow.cpp mainwindow.h mythread.cpp mythread.h capture.h capture.cpp
         Mylabel.cpp Mylabel.h camera.h camera.cpp serial.h serial.cpp common.h common.cpp test.cpp bmpfile.h)
 add_executable(program ${SOURCE_FILES})
 target_link_libraries(program Threads::Threads ${OpenCV_LIBS} JHCap Qt5::Core Qt5::Widgets Qt5::Gui Qt5::UiTools Qt5::Xml Qt5::Network Qt5::Qml Qt5::Quick)

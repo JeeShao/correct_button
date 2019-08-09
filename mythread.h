@@ -12,6 +12,7 @@
 #include "serial.h"
 #include "common.h"
 #include "capture.h"
+#include "camera.h"
 using namespace cv;
 
 extern QMutex mutex;
@@ -45,6 +46,7 @@ signals:
     void updateExposure(int val);
     void updateGain(int val);
     void showInitImg(Mat img);//显示校正图像
+    void cameraLoss();
 
 public slots:
     void lossCamera();
