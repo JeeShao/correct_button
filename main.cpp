@@ -1,6 +1,8 @@
 #include "mainwindow.h"
 int main(int argc, char *argv[])
 {
+	if(init_sys())
+		return -1;
     qRegisterMetaType<string>("string");//注册string
     qRegisterMetaType<Mat>("Mat");//注册Mat
 

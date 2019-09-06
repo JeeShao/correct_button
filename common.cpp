@@ -132,8 +132,15 @@ vector<Mat> rotation(Mat img,Point center)
     vector<Mat> rotation_imgs;
     Mat map_matrix,res,dst;
 
-//    namedWindow("rotation",0);
-//    resizeWindow("rotation",width/2,height/2);
+//    for(int i=-2;i<=2;i+=2){ //3度
+//        //map_matrix=getRotationMatrix2D(center,i,1.0);  //旋转中心，角度，缩放比例
+//        map_matrix=getRotationMatrix2D(center, i, 1.0);  //旋转中心，角度，缩放比例
+//        warpAffine(img,dst,map_matrix,Size(img.cols,img.rows));
+//        res = dst.clone();
+//        rotation_imgs.push_back(res);
+////        imshow("rotation",res(Rect(img.cols*(1.0/3)/2,img.rows*(1.0/3)/2,(2.0/3)*img.cols,(2.0/3)*img.rows)));
+////        cvWaitKey(5);
+//    }
 
     for(int i=-6;i<=6;i+=2){ //7度
         //map_matrix=getRotationMatrix2D(center,i,1.0);  //旋转中心，角度，缩放比例
@@ -141,9 +148,6 @@ vector<Mat> rotation(Mat img,Point center)
         warpAffine(img,dst,map_matrix,Size(img.cols,img.rows));
         res = dst.clone();
         rotation_imgs.push_back(res);
-
-//        imshow("rotation",res(Rect(img.cols*(1.0/3)/2,img.rows*(1.0/3)/2,(2.0/3)*img.cols,(2.0/3)*img.rows)));
-//        cvWaitKey(5);
     }
 
 
@@ -158,6 +162,7 @@ vector<Mat> move1(vector<Mat> rotate_imgs,Rect rect,int flag)
     Rect match=rect;
     for(vector<Mat>::iterator it=rotate_imgs.begin();it!=rotate_imgs.end();it++){//7张旋转图
         for(int i=-6;i<=6;i+=3){//5张平移
+//        for(int i=-3;i<=3;i+=3){//3张平移
             if(flag==0)//上下矩形
             {match.y=rect.y+i;}
             else
@@ -250,9 +255,10 @@ string get_time( ) {
 }
 
 bool init_sys(){
-    string end = "201907302023";
-    string now = get_time();
-    if(now>end)
+    string start = "201908202023";
+    string end   = "201909302023";
+    string now   = get_time();
+    if(now>end || now<start)
         return 1;
     else
         return 0;

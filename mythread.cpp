@@ -555,6 +555,8 @@ int MyThread::match()
                         }
                     }
                     finish = clock();
+//                    total_time = (double) ((finish - start) * 1000 / CLOCKS_PER_SEC);//ms
+//                    printf("识别时间 = %gms\n", total_time);//毫秒
                     if(DEBUG){
                         total_time = (double) ((finish - start) * 1000 / CLOCKS_PER_SEC);//ms
                         printf("识别时间 = %gms\n", total_time);//毫秒
@@ -572,7 +574,7 @@ int MyThread::match()
             else if (DATA_REC[1] == 0xFE) {return -1;} //退出识别
             else if (DATA_REC[1] == 0xFF) {return 1;} //进入模板生成模式
             else if (DATA_REC[1] == 0xFB) {return 0;}//进入相机校正模式
-            else if (DATA_REC[1] == 0xF1) {if(DEBUG) cout<<"关机";system("shutdown -h now");}//进入相机校正模式
+            else if (DATA_REC[1] == 0xF1) {if(DEBUG) cout<<"关机";system("shutdown -h now");}//关机
         }
         else if(nbyte==5){//设置参数
             setParams();
@@ -614,7 +616,7 @@ bool MyThread::takePhoto()
 //        qDebug()<<"拍照完成";
         FINISH_TAKE_PHOTO= 0;
         finish = clock();
-        cout<<"take "<<(double) ((finish - start) * 1000 / CLOCKS_PER_SEC)<<"ms"<<endl;//ms
+//        cout<<"take "<<(double) ((finish - start) * 1000 / CLOCKS_PER_SEC)<<"ms"<<endl;//ms
         return true;
     }
     else{
