@@ -133,17 +133,13 @@ vector<Mat> rotation(Mat img,Point center)
     Mat map_matrix,res,dst;
 
 //    for(int i=-2;i<=2;i+=2){ //3度
-//        //map_matrix=getRotationMatrix2D(center,i,1.0);  //旋转中心，角度，缩放比例
 //        map_matrix=getRotationMatrix2D(center, i, 1.0);  //旋转中心，角度，缩放比例
 //        warpAffine(img,dst,map_matrix,Size(img.cols,img.rows));
 //        res = dst.clone();
 //        rotation_imgs.push_back(res);
-////        imshow("rotation",res(Rect(img.cols*(1.0/3)/2,img.rows*(1.0/3)/2,(2.0/3)*img.cols,(2.0/3)*img.rows)));
-////        cvWaitKey(5);
 //    }
 
     for(int i=-6;i<=6;i+=2){ //7度
-        //map_matrix=getRotationMatrix2D(center,i,1.0);  //旋转中心，角度，缩放比例
         map_matrix=getRotationMatrix2D(center, i, 1.0);  //旋转中心，角度，缩放比例
         warpAffine(img,dst,map_matrix,Size(img.cols,img.rows));
         res = dst.clone();
@@ -444,7 +440,6 @@ void read_params(){
     ifstream fileinput;
     try {
         fileinput.open(PARAMS_PATH.c_str());
-
     }catch ( exception &e){
         cerr << "Caught: " << e.what( ) << endl;
         cerr << "Type: " << typeid( e ).name( ) << endl << endl;

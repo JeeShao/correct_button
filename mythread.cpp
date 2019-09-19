@@ -555,8 +555,8 @@ int MyThread::match()
                         }
                     }
                     finish = clock();
-//                    total_time = (double) ((finish - start) * 1000 / CLOCKS_PER_SEC);//ms
-//                    printf("识别时间 = %gms\n", total_time);//毫秒
+                    total_time = (double) ((finish - start) * 1000 / CLOCKS_PER_SEC);//ms
+                    printf("识别时间 = %gms\n", total_time);//毫秒
                     if(DEBUG){
                         total_time = (double) ((finish - start) * 1000 / CLOCKS_PER_SEC);//ms
                         printf("识别时间 = %gms\n", total_time);//毫秒
